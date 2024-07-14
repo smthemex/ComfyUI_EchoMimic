@@ -51,6 +51,11 @@ pip install xformers==0.0.24
 pip install facenet_pytorch    
 
 diffuser >0.26 or 0.29 is best   
+如果ffmpeg 报错，if ffmpeg error：  
+```
+pip uninstall ffmpeg   
+pip install ffmpeg-python  
+```
 我改了官方的diffuser支持，不支持官方支持的0.24版本，最好不要用0.24版的   
 这个方法的torch最高支持2.2.0，因为facenet_pytorch最高支持2.2.0，所以最要玩这个，最好是先卸载，再安装以上的python库。cu版本低的可以换成cu181     
 The torch of this method supports up to 2.2.0, because facenet_pytorch supports up to 2.2.0, so it is best to uninstall it first and then install the above Python libraries. The lower version of CU can be replaced with CU181     
