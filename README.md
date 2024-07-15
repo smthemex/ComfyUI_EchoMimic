@@ -25,10 +25,12 @@ My ComfyUI node list：
 16、ComfyUI_Stable_Makeup node: [ComfyUI_Stable_Makeup](https://github.com/smthemex/ComfyUI_Stable_Makeup)  
 17、ComfyUI_EchoMimic node:  [ComfyUI_EchoMimic](https://github.com/smthemex/ComfyUI_EchoMimic)   
 
-TO：
+Update：
 ---
-More features to be launched   
-官方还在更新，我一步步来。  
+Pose的错误已修正，与VH节点连接的音频目前有bug，如果需要合成声音的结果，请打开save_video；   
+接入comfyUI的音频加载节点； 
+The pose error has been corrected, and there is currently a bug in the audio connected to the VH node. If you need to synthesize the sound results, please open save_video     
+Connect to the audio loading node of ComfyUI;   
 
 
 1.Installation
@@ -101,11 +103,13 @@ if using Pose-Drived Algo Inference
 
 Example
 -----
- 
+ old workflow   
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/123.gif)
 
-add audio or keep save_video Ture  加声音请把ave_video打开
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/audio.png)
+ pose example  pose的示例，不再是人头像；  
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/POSE.png)
+
+ 
  
 6 Citation
 ------
