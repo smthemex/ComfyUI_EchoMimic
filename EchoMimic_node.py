@@ -6,9 +6,12 @@ import pickle
 import random
 import sys
 from pathlib import Path
+from shutil import copyfile, copy
+
 import cv2
 import numpy as np
 import torch
+import torchaudio
 from diffusers import AutoencoderKL,DDIMScheduler
 from huggingface_hub import hf_hub_download
 from omegaconf import OmegaConf
@@ -17,6 +20,7 @@ from .src.models.unet_2d_condition import UNet2DConditionModel
 from .src.models.unet_3d_echo import EchoUNet3DConditionModel
 from .src.models.whisper.audio2feature import load_audio_model
 from .src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
+from .src.pipelines.pipeline_echo_mimic_pose import AudioPose2VideoPipeline
 from .src.utils.util import save_videos_grid, crop_and_pad
 from .src.models.face_locator import FaceLocator
 from moviepy.editor import VideoFileClip, AudioFileClip
@@ -78,8 +82,6 @@ if not torch.cuda.is_available():
 inference_config_path = os.path.join(current_path,"configs","inference","inference_v2.yaml")
 infer_config = OmegaConf.load(inference_config_path)
 
-
-
 def select_face(det_bboxes, probs):
     ## max face from faces that the prob is above 0.8
     ## box: xyxy
@@ -93,6 +95,19 @@ def select_face(det_bboxes, probs):
         return None
     sorted_bboxes = sorted(filtered_bboxes, key=lambda x: (x[3] - x[1]) * (x[2] - x[0]), reverse=True)
     return sorted_bboxes[0]
+
+# def get_audio(file, start_time=0, duration=0):
+#     args = [ffmpeg_path, "-v", "error", "-i", file]
+#     if start_time > 0:
+#         args += ["-ss", str(start_time)]
+#     if duration > 0:
+#         args += ["-t", str(duration)]
+#     try:
+#         res =  subprocess.run(args + ["-f", "wav", "-"],
+#                               stdout=subprocess.PIPE, check=True).stdout
+#     except subprocess.CalledProcessError as e:
+#         raise f"Failed to extract audio from: {e}"
+#     return res
 
 def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
                   facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device,pipe,face_detector,save_video,visualizer=None):
@@ -140,7 +155,7 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
             pose_list.append(
                 torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
         face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-        
+        ref_image_pil=uploaded_img.convert("RGB")
     else:
         face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
             0).unsqueeze(0) / 255.0
@@ -160,10 +175,9 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         fps=fps,
         context_overlap=context_overlap
     ).videos
-
     filename_prefix = ''.join(random.choice("0123456789") for _ in range(5))
-    output_file =os.path.join(folder_paths.temp_directory,f"{filename_prefix}_echo.mp4")
-    ouput_list=save_videos_grid(video,output_file, n_rows=1,fps=fps,save_video=save_video)
+    output_file = os.path.join(folder_paths.output_directory, f"{filename_prefix}_echo.mp4")
+    ouput_list = save_videos_grid(video, output_file, n_rows=1, fps=fps, save_video=save_video)
     if save_video:
         output_video_path=os.path.join(folder_paths.output_directory,f"{filename_prefix}_audio.mp4")
         video_clip = VideoFileClip(output_file)
@@ -173,6 +187,9 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
             output_video_path,
             codec="libx264", audio_codec="aac")
         print(f"saving {output_video_path}")
+        video_clip.close()
+        audio_clip.close()
+        del audio_clip,video_clip
     return ouput_list
 
 
@@ -359,13 +376,17 @@ class Echo_LoadModel:
         
         denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
         if use_pose:
+            # face locator init
+            face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
+                dtype=weight_dtype, device="cuda")
+            face_locator.load_state_dict(torch.load(face_locator_pt))
             visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=False)
         else:
-            visualizer=None
-        ## face locator init
-        face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
-            dtype=weight_dtype, device="cuda")
-        face_locator.load_state_dict(torch.load(face_locator_pt))
+            # face locator init
+            face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
+                dtype=weight_dtype, device="cuda")
+            face_locator.load_state_dict(torch.load(face_locator_pt))
+            visualizer = None
         
         ## load audio processor params
         audio_processor = load_audio_model(model_path=audio_pt, device=device)
@@ -378,15 +399,26 @@ class Echo_LoadModel:
     
         sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
         scheduler = DDIMScheduler(**sched_kwargs)
-        
-        pipe = Audio2VideoPipeline(
-            vae=vae,
-            reference_unet=reference_unet,
-            denoising_unet=denoising_unet,
-            audio_guider=audio_processor,
-            face_locator=face_locator,
-            scheduler=scheduler,
-        ).to("cuda", dtype=weight_dtype)
+        if use_pose:
+            pipe = AudioPose2VideoPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to("cuda", dtype=weight_dtype)
+       
+        else:
+            pipe = Audio2VideoPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to("cuda", dtype=weight_dtype)
+       
         return (pipe,face_detector,visualizer)
     
 
@@ -396,7 +428,7 @@ class Echo_Sampler:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "audio": ("STRING", {"default": "123"}),
+                "audio": ("AUDIO",),
                 "pipe": ("MODEL",),
                 "face_detector": ("MODEL",),
                 "seeds": ("INT", {"default": 0, "min": 0, "max":10000}),
@@ -408,11 +440,12 @@ class Echo_Sampler:
                 "facecrop_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "context_frames": ("INT", {"default": 12, "min": 0, "max": 50}),
                 "context_overlap": ("INT", {"default": 3, "min": 0, "max": 10}),
-                "length": ("INT", {"default": 1200, "min": 100, "max": 5000, "step": 1, "display": "number"}),
+                "length": ("INT", {"default": 120, "min": 100, "max": 5000, "step": 1, "display": "number"}),
                 "width": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "height": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "save_video": ("BOOLEAN", {"default": True},), },
-            "optional": { "visualizer": ("MODEL",),}
+            "optional": { "visualizer": ("MODEL",),
+                         }
         }
     
     RETURN_TYPES = ("IMAGE","STRING","FLOAT")
@@ -420,16 +453,19 @@ class Echo_Sampler:
     FUNCTION = "em_main"
     CATEGORY = "EchoMimic"
     
-    def em_main(self, image, audio,pipe,face_detector,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,length,
+    def em_main(self, image,audio,pipe,face_detector,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,length,
                     width, height,save_video,**kwargs):
         image=tensor_to_pil(image)
         visualizer = kwargs.get("visualizer")
-        output_video = process_video(image, audio, width, height, length, seeds, facemask_ratio,
+        audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(5))
+        audio_file = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_temp.wav")
+        torchaudio.save(audio_file, audio["waveform"].squeeze(0), sample_rate=audio["sample_rate"])
+        output_video = process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
                                      facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
                                      device, pipe, face_detector, save_video,visualizer)
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
-        return (images,audio,fps)
+        return (images,audio_file,fps)
 
 
 NODE_CLASS_MAPPINGS = {
