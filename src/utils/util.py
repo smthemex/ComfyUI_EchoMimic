@@ -52,7 +52,7 @@ def save_videos_from_pil(pil_images, path, fps=8, audio_path=None):
     import av
 
     save_fmt = Path(path).suffix
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    #os.makedirs(os.path.dirname(path), exist_ok=True)
     width, height = pil_images[0].size
 
     if save_fmt == ".mp4":
