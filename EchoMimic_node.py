@@ -20,7 +20,7 @@ from .src.models.unet_3d_echo import EchoUNet3DConditionModel
 from .src.models.whisper.audio2feature import load_audio_model
 from .src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
 from .src.pipelines.pipeline_echo_mimic_pose import AudioPose2VideoPipeline
-from src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline as AudioPose2VideoaccPipeline
+from .src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline as AudioPose2VideoaccPipeline
 from .src.utils.util import save_videos_grid, crop_and_pad
 from .src.models.face_locator import FaceLocator
 from .src.utils.draw_utils import FaceMeshVisualizer
