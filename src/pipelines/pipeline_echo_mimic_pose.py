@@ -26,7 +26,6 @@ from ..models.mutual_self_attention import ReferenceAttentionControl
 from .context import get_context_scheduler
 from .utils import get_tensor_interpolation_method
 
-
 @dataclass
 class AudioPose2VideoPipelineOutput(BaseOutput):
     videos: Union[torch.Tensor, np.ndarray]
@@ -536,10 +535,12 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
                         .to(device)
                         .repeat(2 if do_classifier_free_guidance else 1, 1, 1, 1, 1)
                     )
-                    audio_latents = torch.cat([audio_fea_final[:, c] for c in new_context]).to(device)
-                    audio_latents = torch.cat([torch.zeros_like(audio_latents), audio_latents], 0)
-                    pose_latents = torch.cat([face_locator_tensor[:, :, c] for c in new_context]).to(device)
-                    pose_latents = torch.cat([torch.zeros_like(pose_latents), pose_latents], 0)
+
+                    audio_latents_cond = torch.cat([audio_fea_final[:, c] for c in new_context]).to(device)
+                    audio_latents = torch.cat([torch.zeros_like(audio_latents_cond), audio_latents_cond], 0)
+                    pose_latents_cond = torch.cat([face_locator_tensor[:, :, c] for c in new_context]).to(device)
+                    zero_pose_latents = torch.cat([zero_locator_tensor[:, :, c] for c in new_context]).to(device)
+                    pose_latents = torch.cat([torch.zeros_like(zero_pose_latents), pose_latents_cond], 0)
 
                     latent_model_input = self.scheduler.scale_model_input(
                         latent_model_input, t
@@ -549,8 +550,8 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
                         latent_model_input,
                         t,
                         encoder_hidden_states=None,
-                        audio_cond_fea=audio_latents,
-                        face_musk_fea=pose_latents * 0.75,
+                        audio_cond_fea=audio_latents if do_classifier_free_guidance else audio_latents_cond,
+                        face_musk_fea=pose_latents if do_classifier_free_guidance else pose_latents_cond,
                         return_dict=False,
                     )[0]
 
