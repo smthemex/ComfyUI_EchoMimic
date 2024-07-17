@@ -27,8 +27,18 @@ My ComfyUI node list：
 
 Update：
 ---
-Pose的错误已修正，与VH节点连接的音频目前有bug，如果需要合成声音的结果，请打开save_video；   
-接入comfyUI的音频加载节点； 
+2024/07/17   
+--- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等..   
+---motion_syn 的生成的pkl文件,默认存储在input/tensorrt_lite文件夹下,  
+--- 有几种模式可以选,比如基于视频的音画同步(开启audio_form_video,开启motion_sync,选择参考视频),仅画面同步(关闭audio_form_video,开启motion_sync,选择参考视频),pose参考其他pkl模式(关闭audio_form_video,关闭motion_sync,pose_dir选择pose目录)    
+--- 即将有加速模型..  
+--- motion_sync is working, I am very busy, so I did not test it in detail.     
+---The generated pkl file for motion_styn is stored by default in the input/sensorrt_lite folder,      
+---There are several modes to choose from, such as video based audio and image synchronization (turn on audio_form-video, turn on motion_stync, select reference video), only picture synchronization (turn off audio_form-video, turn on motion_stync, select reference video), pose reference to other pkl modes (turn off audio_form_fideo, turn off motion_stync, select pose directory for pose dir)   
+
+--- 
+Pose的错误已修正，与VH节点连接的音频目前有bug，如果需要合成声音的结果，请打开save_video；     
+接入comfyUI的音频加载节点；    
 The pose error has been corrected, and there is currently a bug in the audio connected to the VH node. If you need to synthesize the sound results, please open save_video     
 Connect to the audio loading node of ComfyUI;   
 
@@ -103,14 +113,15 @@ if using Pose-Drived Algo Inference
 
 Example
 -----
- old workflow   
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/123.gif)
+mormal workflow   
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/normal.gif)
 
- pose example  pose的示例，不再是人头像；  
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/POSE.png)
+motion_sync  
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync.png)
 
- 
- 
+using  motion_sync  cpl   pose   
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/using%20motion%20pose.png)
+
 6 Citation
 ------
 ``` python  
