@@ -27,21 +27,24 @@ My ComfyUI node list：
 
 Update：
 ---
+
 2024/07/17   
---- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等..   
----motion_syn 的生成的pkl文件,默认存储在input/tensorrt_lite文件夹下,  
---- 有几种模式可以选,比如基于视频的音画同步(开启audio_form_video,开启motion_sync,选择参考视频),仅画面同步(关闭audio_form_video,开启motion_sync,选择参考视频),pose参考其他pkl模式(关闭audio_form_video,关闭motion_sync,pose_dir选择pose目录)    
---- 支持加速模型..  
---- motion_sync is working, I am very busy, so I did not test it in detail.     
----The generated pkl file for motion_styn is stored by default in the input/sensorrt_lite folder,      
----There are several modes to choose from, such as video based audio and image synchronization (turn on audio_form-video, turn on motion_stync, select reference video), only picture synchronization (turn off audio_form-video, turn on motion_stync, select reference video), pose reference to other pkl modes (turn off audio_form_fideo, turn off motion_stync, select pose directory for pose dir)   
+--- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等.首次使用会生成生成的pkl文件,以及基于该视频的pose动画,pkl文件存储在input/tensorrt_lite文件夹下(重启comfyUI后调用,在pose_dir菜单中选择),       
+--- audio_form_video 菜单的主要功能是提取参考视频的音频,开启时,音频节点输入的音频无效,所以使用此功能时,请确认你的参考视频有声音.   
+--- pose_mode选择turbo,开启加速模型(denoising_unet_pose_acc.pth  motion_module_pose_acc.pth ),cfg 1,step 6或者更高,约50s出图.  
+--- pose_dir菜单 在pose为normal或turbo时有效,模型路径指向input/tensorrt_lite,如果选择none,则是用官方默认的pose.   
+
+---The action synchronization (motion_sync) function has been launched. You can load the video you want to synchronize, extract its facial features and speech posture. The first use will generate the generated pkl file, as well as the post animation based on the video. The pkl file is stored in the input/tensor_lite folder (called after restarting the comfyUI, select from the pose_dir menu),    
+---The main function of the audio_form_fideo menu is to extract the audio of the reference video. When turned on, the audio input from the audio node is invalid. Therefore, when using this function, please confirm that your reference video has sound    
+---Select turbo for pose_mode, activate the acceleration model (denoising_unet_pose acc. pth motif module pose acc. pth), cfg 1, step 6 or higher, and the image will be generated in approximately 50 seconds   
+---The pose_dir menu is valid when pose is normal or turbo, and the model path points to input/sensorrt_lite. If none is selected, the official default pose will be used    
+
 
 --- 
-Pose的错误已修正，与VH节点连接的音频目前有bug，如果需要合成声音的结果，请打开save_video；     
+audio输出连接VH节点时有bug，如果需要合成声音的结果，请打开save_video；     
 接入comfyUI的音频加载节点；    
 The pose error has been corrected, and there is currently a bug in the audio connected to the VH node. If you need to synthesize the sound results, please open save_video     
 Connect to the audio loading node of ComfyUI;   
-
 
 1.Installation
 -----
@@ -76,6 +79,8 @@ If the module is missing, , pip install  missing module.
 
 3 Need  model 
 ----
+如果能直连抱脸,点击就会自动下载所需模型,不需要需下载.  
+
 Audio-Drived Algo Inference   
 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)  
 other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
@@ -95,7 +100,7 @@ other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)
 vae    
 stabilityai/sd-vae-ft-mse  [link](https://huggingface.co/stabilityai/sd-vae-ft-mse) 
 
-if using Pose-Drived Algo Inference  
+Using Pose-Drived Algo Inference  
 ```
 ├── ComfyUI/models/  
 |     ├──echo_mimic
@@ -109,7 +114,7 @@ if using Pose-Drived Algo Inference
 |         ├── motion_module_pose.pth
 |         ├── reference_unet_pose.pth
 ```
-if using Pose-turbo   
+Using Pose-turbo   
 ```
 ├── ComfyUI/models/  
 |     ├──echo_mimic
@@ -125,16 +130,19 @@ if using Pose-turbo
 ```
 
 
+
 Example
 -----
-mormal workflow   
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/normal.gif)
+mormal Audio-Drived Algo Inference  workflow  音频驱动视频常规示例    
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/audio.gif)
 
-motion_sync  
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync.png)
+motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video 直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型  
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_from_video.png)
 
-using  motion_sync  cpl   pose   
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/using%20motion%20pose.png)
+pose from pkl, 基于预生成的pkl模型生成视频.  
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/pose_form_pkl.png)
+
+
 
 6 Citation
 ------
