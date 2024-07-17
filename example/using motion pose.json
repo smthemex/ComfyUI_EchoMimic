@@ -1,0 +1,338 @@
+{
+  "last_node_id": 44,
+  "last_link_id": 93,
+  "nodes": [
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "pos": [
+        995,
+        29
+      ],
+      "size": {
+        "0": 315,
+        "1": 314
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            86
+          ],
+          "shape": 3,
+          "label": "IMAGE",
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3,
+          "label": "MASK"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "d.png",
+        "image"
+      ]
+    },
+    {
+      "id": 44,
+      "type": "ShowText|pysssss",
+      "pos": [
+        1853,
+        270
+      ],
+      "size": {
+        "0": 304.4192810058594,
+        "1": 186.81216430664062
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 93,
+          "widget": {
+            "name": "text"
+          },
+          "label": "text"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "shape": 6,
+          "label": "STRING"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        "",
+        "F:\\test\\ComfyUI\\input\\temp_00133_tem.mp3"
+      ]
+    },
+    {
+      "id": 20,
+      "type": "LoadAudio",
+      "pos": [
+        995,
+        400
+      ],
+      "size": {
+        "0": 315,
+        "1": 124
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            87
+          ],
+          "shape": 3,
+          "label": "AUDIO",
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "walden.wav",
+        null,
+        ""
+      ]
+    },
+    {
+      "id": 8,
+      "type": "Echo_LoadModel",
+      "pos": [
+        995,
+        569
+      ],
+      "size": {
+        "0": 315,
+        "1": 194
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            88
+          ],
+          "shape": 3,
+          "label": "model",
+          "slot_index": 0
+        },
+        {
+          "name": "face_detector",
+          "type": "MODEL",
+          "links": [
+            89
+          ],
+          "shape": 3,
+          "label": "face_detector",
+          "slot_index": 1
+        },
+        {
+          "name": "visualizer",
+          "type": "MODEL",
+          "links": [
+            90
+          ],
+          "shape": 3,
+          "label": "visualizer",
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_LoadModel"
+      },
+      "widgets_values": [
+        "stabilityai/sd-vae-ft-mse",
+        true,
+        true,
+        false,
+        false
+      ]
+    },
+    {
+      "id": 42,
+      "type": "Echo_Sampler",
+      "pos": [
+        1492,
+        251
+      ],
+      "size": {
+        "0": 315,
+        "1": 498
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 86,
+          "label": "image"
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 87,
+          "label": "audio"
+        },
+        {
+          "name": "pipe",
+          "type": "MODEL",
+          "link": 88,
+          "label": "pipe"
+        },
+        {
+          "name": "face_detector",
+          "type": "MODEL",
+          "link": 89,
+          "label": "face_detector"
+        },
+        {
+          "name": "visualizer",
+          "type": "MODEL",
+          "link": 90,
+          "label": "visualizer"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [],
+          "shape": 3,
+          "label": "image",
+          "slot_index": 0
+        },
+        {
+          "name": "audio",
+          "type": "STRING",
+          "links": [
+            93
+          ],
+          "shape": 3,
+          "label": "audio",
+          "slot_index": 1
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "links": null,
+          "shape": 3,
+          "label": "frame_rate"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Sampler"
+      },
+      "widgets_values": [
+        "none",
+        "temp_32181",
+        0,
+        2.5,
+        30,
+        24,
+        16000,
+        0.1,
+        0.5,
+        12,
+        3,
+        120,
+        512,
+        512,
+        false,
+        true
+      ]
+    }
+  ],
+  "links": [
+    [
+      86,
+      4,
+      0,
+      42,
+      0,
+      "IMAGE"
+    ],
+    [
+      87,
+      20,
+      0,
+      42,
+      1,
+      "AUDIO"
+    ],
+    [
+      88,
+      8,
+      0,
+      42,
+      2,
+      "MODEL"
+    ],
+    [
+      89,
+      8,
+      1,
+      42,
+      3,
+      "MODEL"
+    ],
+    [
+      90,
+      8,
+      2,
+      42,
+      4,
+      "MODEL"
+    ],
+    [
+      93,
+      42,
+      1,
+      44,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.2100000000000004,
+      "offset": {
+        "0": -719.6619262695312,
+        "1": 65.44701385498047
+      }
+    }
+  },
+  "version": 0.4
+}
