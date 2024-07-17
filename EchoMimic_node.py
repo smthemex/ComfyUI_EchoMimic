@@ -20,6 +20,7 @@ from .src.models.unet_3d_echo import EchoUNet3DConditionModel
 from .src.models.whisper.audio2feature import load_audio_model
 from .src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
 from .src.pipelines.pipeline_echo_mimic_pose import AudioPose2VideoPipeline
+from src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline as AudioPose2VideoaccPipeline
 from .src.utils.util import save_videos_grid, crop_and_pad
 from .src.models.face_locator import FaceLocator
 from .src.utils.draw_utils import FaceMeshVisualizer
@@ -372,7 +373,7 @@ class Echo_LoadModel:
             "required": {
                 "vae":("STRING", {"default": "stabilityai/sd-vae-ft-mse"}),
                 "denoising":("BOOLEAN", {"default": True},),
-                "use_pose": ("BOOLEAN", {"default": False},),
+                "pose_mode": (["none","normal", "turbo"],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync": ("BOOLEAN", {"default": False},),
             }
@@ -383,7 +384,7 @@ class Echo_LoadModel:
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
 
-    def main_loader(self,vae,denoising,use_pose,draw_mouse,motion_sync):
+    def main_loader(self,vae,denoising,pose_mode,draw_mouse,motion_sync):
  
         ############# model_init started #############
         ## vae init
@@ -397,11 +398,18 @@ class Echo_LoadModel:
         audio_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", subfolder="audio_processor",
                                     pt_name="whisper_tiny.pt")
         
-        if use_pose:
+        if pose_mode=="normal":
             re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
             motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_pose.pth")
             denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose.pth")
             face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator_pose.pth")
+        elif pose_mode=="turbo":
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                           pt_name="motion_module_pose_acc.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose_acc.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                               pt_name="face_locator_pose.pth")
         else:
             re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
             motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module.pth")
@@ -450,7 +458,7 @@ class Echo_LoadModel:
             ).to(dtype=weight_dtype, device=device)
         
         denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
-        if use_pose:
+        if pose_mode!="none":
             # face locator init
             face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
                 dtype=weight_dtype, device="cuda")
@@ -476,7 +484,7 @@ class Echo_LoadModel:
     
         sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
         scheduler = DDIMScheduler(**sched_kwargs)
-        if use_pose:
+        if pose_mode=="normal":
             pipe = AudioPose2VideoPipeline(
                 vae=vae,
                 reference_unet=reference_unet,
@@ -485,7 +493,15 @@ class Echo_LoadModel:
                 face_locator=face_locator,
                 scheduler=scheduler,
             ).to("cuda", dtype=weight_dtype)
-       
+        elif pose_mode=="turbo":
+            pipe = AudioPose2VideoaccPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to("cuda", dtype=weight_dtype)
         else:
             pipe = Audio2VideoPipeline(
                 vae=vae,
