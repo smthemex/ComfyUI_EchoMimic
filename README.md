@@ -31,7 +31,7 @@ Update：
 --- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等..   
 ---motion_syn 的生成的pkl文件,默认存储在input/tensorrt_lite文件夹下,  
 --- 有几种模式可以选,比如基于视频的音画同步(开启audio_form_video,开启motion_sync,选择参考视频),仅画面同步(关闭audio_form_video,开启motion_sync,选择参考视频),pose参考其他pkl模式(关闭audio_form_video,关闭motion_sync,pose_dir选择pose目录)    
---- 即将有加速模型..  
+--- 支持加速模型..  
 --- motion_sync is working, I am very busy, so I did not test it in detail.     
 ---The generated pkl file for motion_styn is stored by default in the input/sensorrt_lite folder,      
 ---There are several modes to choose from, such as video based audio and image synchronization (turn on audio_form-video, turn on motion_stync, select reference video), only picture synchronization (turn off audio_form-video, turn on motion_stync, select reference video), pose reference to other pkl modes (turn off audio_form_fideo, turn off motion_stync, select pose directory for pose dir)   
@@ -107,6 +107,20 @@ if using Pose-Drived Algo Inference
 |         ├── denoising_unet_pose.pth
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose.pth
+|         ├── reference_unet_pose.pth
+```
+if using Pose-turbo   
+```
+├── ComfyUI/models/  
+|     ├──echo_mimic
+|         ├── unet
+|             ├── diffusion_pytorch_model.bin
+|             ├── config.json
+|         ├── audio_processor
+|             ├── whisper_tiny.pt
+|         ├── denoising_unet_pose_acc.pth
+|         ├── face_locator_pose.pth
+|         ├── motion_module_pose_acc.pth
 |         ├── reference_unet_pose.pth
 ```
 
