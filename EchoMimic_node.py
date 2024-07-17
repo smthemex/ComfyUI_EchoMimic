@@ -299,7 +299,7 @@ def instance_path(path, repo):
     return repo
 
 
-def motion_sync_main(vis,width, height,driver_video,image):
+def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
     # vis = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True,
     #                          draw_pupil=True)
     
@@ -308,12 +308,15 @@ def motion_sync_main(vis,width, height,driver_video,image):
     driver_video=os.path.join(folder_paths.input_directory,driver_video)
     image_name = "temp_" + ''.join(random.choice("0123456789") for _ in range(5))
     # base origin video
-    audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.mp3")
-    video_clip = VideoFileClip(driver_video)
-    audio_clip = video_clip.audio
-    audio_clip.write_audiofile(audio_path)
-    audio_clip.close()
-    video_clip.close()
+    if audio_form_video:
+        audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.mp3")
+        video_clip = VideoFileClip(driver_video)
+        audio_clip = video_clip.audio
+        audio_clip.write_audiofile(audio_path)
+        audio_clip.close()
+        video_clip.close()
+    else:
+        audio_path=None
     
     face_img = np.array(image)
     face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
@@ -560,9 +563,9 @@ class Echo_Sampler:
         audio_file = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_temp.wav")
         torchaudio.save(audio_file, audio["waveform"].squeeze(0), sample_rate=audio["sample_rate"])
         if visualizer and video_files!="none":
-            pose_dir,audio_from_video=motion_sync_main(visualizer, width, height, video_files, image)
+            pose_dir,audio_from_v=motion_sync_main(visualizer, width, height, video_files, image,audio_form_video)
             if audio_form_video:
-                audio_file=audio_from_video
+                audio_file=audio_from_v
         elif visualizer and video_files=="none":
             if pose_dir != "none":
                 pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
