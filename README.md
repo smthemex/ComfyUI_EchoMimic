@@ -27,6 +27,9 @@ My ComfyUI node list：
 
 Update：
 ---
+2024/07/19
+zero_locator_tensor 这个形参好像代码不全，导致错误，先去掉。
+修改部分需求文件内容，
 
 2024/07/17   
 --- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等.首次使用会生成生成的pkl文件,以及基于该视频的pose动画,pkl文件存储在input/tensorrt_lite文件夹下(重启comfyUI后调用,在pose_dir菜单中选择),       
