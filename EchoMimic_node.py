@@ -193,14 +193,14 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         output_video_path=os.path.join(folder_paths.output_directory,f"{filename_prefix}_audio.mp4")
         video_clip = VideoFileClip(output_file)
         audio_clip = AudioFileClip(uploaded_audio)
-        video_clip = video_clip.set_audio(audio_clip)
-        video_clip.write_videofile(
+        final_clip = video_clip.set_audio(audio_clip)
+        final_clip.write_videofile(
             output_video_path,
             codec="libx264", audio_codec="aac")
         print(f"saving {output_video_path}")
-        video_clip.close()
-        audio_clip.close()
-        del audio_clip,video_clip
+        video_clip.reader.close()
+        audio_clip.reader.close()
+        final_clip.reader.close_all()
     return ouput_list
 
 
@@ -310,11 +310,11 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
     # base origin video
     if audio_form_video:
         audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.mp3")
-        video_clip = VideoFileClip(driver_video)
+        video_clip = VideoFileClip(driver_video,utf8_errors="ignore")
         audio_clip = video_clip.audio
         audio_clip.write_audiofile(audio_path)
-        audio_clip.close()
-        video_clip.close()
+        video_clip.reader.close()  
+        video_clip.audio.reader.close_proc()
     else:
         audio_path=None
     
