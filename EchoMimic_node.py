@@ -74,6 +74,7 @@ else:
     pose_path_list_=["none",]
 
 
+
 ffmpeg_path = os.getenv('FFMPEG_PATH')
 if ffmpeg_path is None and platform.system() in ['Linux', 'Darwin']:
     try:
@@ -557,7 +558,8 @@ class Echo_Sampler:
     
     def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,length,
                     width, height,audio_form_video,save_video,**kwargs):
-        image=tensor_to_pil(image)
+        image=nomarl_upscale(image,width, height)
+        #image=tensor_to_pil(image)
         visualizer = kwargs.get("visualizer")
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(5))
         audio_file = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_temp.wav")
