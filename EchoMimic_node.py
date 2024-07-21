@@ -214,8 +214,9 @@ def download_weights(file_dir,repo_id,subfolder="",pt_name=""):
         if not os.path.exists(file_path):
             pt_path = hf_hub_download(
                 repo_id=repo_id,
+                subfolder=subfolder,
                 filename=pt_name,
-                local_dir = sub_dir,
+                local_dir = file_dir,
             )
         else:
             pt_path=get_instance_path(file_path)
