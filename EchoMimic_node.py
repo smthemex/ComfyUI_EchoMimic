@@ -311,7 +311,7 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
     image_name = "temp_" + ''.join(random.choice("0123456789") for _ in range(5))
     # base origin video
     if audio_form_video:
-        audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.mp3")
+        audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.wav")
         video_clip = VideoFileClip(driver_video)
         audio_clip = video_clip.audio
         audio_clip.write_audiofile(audio_path)
@@ -552,7 +552,7 @@ class Echo_Sampler:
                 "visualizer": ("MODEL",),}
         }
     
-    RETURN_TYPES = ("IMAGE","STRING","FLOAT")
+    RETURN_TYPES = ("IMAGE","AUDIO","FLOAT")
     RETURN_NAMES = ("image","audio","frame_rate")
     FUNCTION = "em_main"
     CATEGORY = "EchoMimic"
@@ -569,6 +569,8 @@ class Echo_Sampler:
             pose_dir,audio_from_v=motion_sync_main(visualizer, width, height, video_files, image,audio_form_video)
             if audio_form_video:
                 audio_file=audio_from_v
+                waveform, sample_rate = torchaudio.load(audio_from_v)
+                audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
         elif visualizer and video_files=="none":
             if pose_dir != "none":
                 pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
@@ -579,7 +581,8 @@ class Echo_Sampler:
                                      device, pipe, face_detector, save_video,pose_dir, visualizer)
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
-        return (images,audio_file,fps)
+        frame_rate=float(fps)
+        return (images,audio,frame_rate)
 
 
 NODE_CLASS_MAPPINGS = {
