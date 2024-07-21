@@ -27,30 +27,42 @@ My ComfyUI node list：
 
 Update：
 ---
+2024/07/21   
+--修复模型下载的路径定义错误，修复pkl文件路径存放的错误；  
+--将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
+--Fix the incorrect path definition for model download and the error in storing the pkl file path;  
+--Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)   
 
+Function Description
+--
+功能1：音频驱动视频生成，将pose_mode设置成无（none）时启用；   
+功能2：参考视频同步生成，同时生产pkl文件。需要将pose_mode设置成normal或turbo，开启motion_sync，在video_file选择你要同步的视频，设置pose_dir 为无（none）；   
+    --tips： 如果使用参考视频自带的音频，可以开始audio_from_video，此时audio输入的音频失效，此功能仅在motion_sync有效。   
+功能3：参考pkl模型文件，音频驱动视频，需要将pose_mode设置成normal或turbo,在pose_dir选择你要参考的pkl模型目录；   
+    --tips： 如果pose_dir为无（none），则使用内置的pkl模型，也就是插件目录的assets\test_pose_demo_pose；   
+特别的选项：  
+   --save_video：如果不想使用VH节点时，可以开启，默认关闭；     
+   --draw_mouse：你可以试试；    
+   --length：帧数，时长等于length/fps；     
+   --normal和turbo：turbo，6步可以，但是质量略有下降；   
+   --内置内置图片等比例裁切。   
+特别注意的地方：   
+   --cfg数值设置为1，仅在turbo模式有效，其他会报错。    
 
-2024/07/20
---修复音频剪辑关闭的bug，内置图片等比例裁切。
---修改部分需求文件内容，
---cfg 1只能turbo使用，
+Function 1: Audio driven video generation, enabled when pose mode is set to none；   
+Function 2: Generate reference videos synchronously and produce PKL files at the same time. You need to set pose_mode to normal or turbo, enable motion_stync, select the video you want to synchronize in videoFILE, and set pose_dir to none；   
+    --Tip: If you use the audio provided in the reference video, you can start audio_from-video. At this point, the audio input will become invalid, and this function is only effective in motion_stync.
+Function 3: Refer to the pkl model file, drive the audio video, and set pose_mode to normal or turbo. Select the pkl model directory you want to refer to in pose_dir;  
+    --Tip: If pose_dir is none, use the built-in pkl model, which is assets \ test_pose_demo_pose in the plugin directory；   
+Special options:   
+    --Save_video: If you do not want to use VH nodes, you can turn it on, and it is turned off by default；  
+    --Draw_mouse: You can try it out；  
+    --Length: frame rate, duration equal to length/fps；  
+    --Normal and Turbo: Turbo, 6 steps are fine, but the quality has slightly decreased；  
+    --Built in image proportional cropping.   
+Special attention should be paid to:   
+    --The cfg value is set to 1, which is only valid in turbo mode, otherwise an error will be reported. 
 
-2024/07/17   
---- 动作同步(motion_sync)功能已上线,你可以加载想同步的视频,提取其面部特征及说话姿态等.首次使用会生成生成的pkl文件,以及基于该视频的pose动画,pkl文件存储在input/tensorrt_lite文件夹下(重启comfyUI后调用,在pose_dir菜单中选择),       
---- audio_form_video 菜单的主要功能是提取参考视频的音频,开启时,音频节点输入的音频无效,所以使用此功能时,请确认你的参考视频有声音.   
---- pose_mode选择turbo,开启加速模型(denoising_unet_pose_acc.pth  motion_module_pose_acc.pth ),cfg 1,step 6或者更高,约50s出图.  
---- pose_dir菜单 在pose为normal或turbo时有效,模型路径指向input/tensorrt_lite,如果选择none,则是用官方默认的pose.   
-
----The action synchronization (motion_sync) function has been launched. You can load the video you want to synchronize, extract its facial features and speech posture. The first use will generate the generated pkl file, as well as the post animation based on the video. The pkl file is stored in the input/tensor_lite folder (called after restarting the comfyUI, select from the pose_dir menu),    
----The main function of the audio_form_fideo menu is to extract the audio of the reference video. When turned on, the audio input from the audio node is invalid. Therefore, when using this function, please confirm that your reference video has sound    
----Select turbo for pose_mode, activate the acceleration model (denoising_unet_pose acc. pth motif module pose acc. pth), cfg 1, step 6 or higher, and the image will be generated in approximately 50 seconds   
----The pose_dir menu is valid when pose is normal or turbo, and the model path points to input/sensorrt_lite. If none is selected, the official default pose will be used    
-
-
---- 
-audio输出连接VH节点时有bug，如果需要合成声音的结果，请打开save_video；     
-接入comfyUI的音频加载节点；    
-The pose error has been corrected, and there is currently a bug in the audio connected to the VH node. If you need to synthesize the sound results, please open save_video     
-Connect to the audio loading node of ComfyUI;   
 
 1.Installation
 -----
@@ -140,13 +152,13 @@ Using Pose-turbo
 Example
 -----
 mormal Audio-Drived Algo Inference  workflow  音频驱动视频常规示例    
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/audio.gif)
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/base.png)
 
 motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video 直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型  
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_from_video.png)
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_using_audio_from_video.png)
 
 pose from pkl, 基于预生成的pkl模型生成视频.  
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/pose_form_pkl.png)
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/normal.png)
 
 
 
