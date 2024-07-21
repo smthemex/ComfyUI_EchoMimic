@@ -350,11 +350,8 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
         poses_add_driver = [(i * 0.5 + j * 0.5).clip(0, 255).astype(np.uint8) for i, j in
                             zip(input_frames_cv2, pose_frames_driver)]
     
-    #save_dir = '{}'.format(ref_image.rsplit('/',1)[-1].replace('.png', ''))
-    save_name=ref_image.rsplit('/',1)[-1].replace('.png', '')
-    save_dir=os.path.join(tensorrt_lite, save_name)
+    save_dir=os.path.join(tensorrt_lite,image_name)
     os.makedirs(save_dir, exist_ok=True)
-    #print(save_dir,1)
     
     sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
     for i in range(len(sequence_det_ms)):
@@ -368,7 +365,7 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
     # output_video_path = os.path.join(folder_paths.output_directory, f"{image_name}_.mp4")
     # if save_video:
     #     save_video_from_cv2_list(poses_cat, output_video_path, fps=fps)
-    #print(save_dir,2)
+
     return  save_dir,audio_path
 
 
