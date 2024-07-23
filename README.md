@@ -27,6 +27,10 @@ My ComfyUI node list：
 
 Update：
 ---
+2024/07/23
+--修复motion_sync不启用的bug，save_video现在默认关闭；  
+--Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;  
+
 2024/07/21   
 --修复模型下载的路径定义错误，修复pkl文件路径存放的错误；  
 --将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
