@@ -548,7 +548,7 @@ class Echo_Sampler:
                 "width": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "height": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "audio_form_video": ("BOOLEAN", {"default": False},),
-                "save_video": ("BOOLEAN", {"default": True},), },
+                "save_video": ("BOOLEAN", {"default": False},), },
             "optional": {
                 "visualizer": ("MODEL",),}
         }
@@ -566,23 +566,21 @@ class Echo_Sampler:
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(5))
         audio_file = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_temp.wav")
         torchaudio.save(audio_file, audio["waveform"].squeeze(0), sample_rate=audio["sample_rate"])
-        if visualizer and video_files!="none":
-            if video_files=="none":
-                pose_dir,audio_from_v=motion_sync_main(visualizer, width, height, video_files, image,audio_form_video)
-                if audio_form_video:
-                    audio_file=audio_from_v
-                    waveform, sample_rate = torchaudio.load(audio_from_v)
-                    audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
-            else:
-                if pose_dir != "none":
-                    pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
+        
+        if visualizer: #pose
+            if pose_dir=="none": #motion sync
+                if video_files!="none":
+                    pose_dir, audio_from_v = motion_sync_main(visualizer, width, height, video_files, image,
+                                                              audio_form_video)
+                    if audio_form_video:
+                        audio_file = audio_from_v
+                        waveform, sample_rate = torchaudio.load(audio_from_v)
+                        audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
                 else:
-                    pose_dir=os.path.join(current_path,"assets","test_pose_demo_pose") # default
-        elif visualizer and video_files=="none":
-            if pose_dir != "none":
-                pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
+                    pose_dir = os.path.join(current_path, "assets", "test_pose_demo_pose")  # default
             else:
-                pose_dir=os.path.join(current_path,"assets","test_pose_demo_pose") # default
+                pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
+              
         output_video = process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
                                      facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
                                      device, pipe, face_detector, save_video,pose_dir, visualizer)
