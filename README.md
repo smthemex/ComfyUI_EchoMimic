@@ -79,23 +79,49 @@ git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 ----
 ```
 pip install -r requirements.txt
-
+pip install opencv-python
 ```
-or 
-pip  uninstall torchaudio torchvision torch xformers   
+Notice
+---
+你可以根据自己的torch环境去查阅适配的opencv-python版本，其最高支持torch 2.2.0 以及相应的torchvision/torchaudio/xformers（具体最高支持的版本号如下）    
+如果是便携包，需要在python_embeded目录下，运行python -m pip install XXX 或者python -m pip uninstall XXX，以下是示例     
+You can refer to the compatible OpenCV Python version based on your torch environment, which supports up to torch 2.2.0 and the corresponding torch vision/torch audio/xiformers (the specific highest supported version numbers are as follows)     
+if using python_embeded comfyUI,need in python_embeded open CMD ,and python -m pip install python_embeded    
+
+如果安装 opencv-python 后comfyUI无法正常打开，请按以下命令先卸载，再安装：     
+If comfyUI cannot be opened properly after installing OpenCV Python, please uninstall it first and then install it using the following command:       
+```
+pip uninstall torchaudio torchvision torch xformers      
 pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121   
 pip install xformers==0.0.24   
-pip install facenet_pytorch    
+```
+如果是便携包， 需要在python_embeded目录下，运行python -m pip install XXX 或者python -m pip uninstall XXX，以下是示例   
+if using python_embeded comfyUI,need in python_embeded open CMD ,and python -m pip install python_embeded，   
+```
+python -m pip uninstall torchaudio torchvision torch xformers   
+python -m pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121   
+python -m pip install xformers==0.0.24   
+```
+or 或者  
+delete python_embeded/Lib/site-packages name"torchaudio,torchvision,torch,xformers "dir     
+或者直接删除python_embeded/Lib/site-packages 下面的torchaudio,torchvision,torch,xformers目录，然后按以下命令安装：     
+```
+python pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121 --target"X:/XXX/XX/python_embeded/Lib/site-packages"
+python pip install xformers==0.0.24 --target"X:/XXX/XX/python_embeded/Lib/site-packages"
+```
+other:
+diffuser >0.26 or 0.29 is best
 
-diffuser >0.26 or 0.29 is best   
 如果ffmpeg 报错，if ffmpeg error：  
 ```
 pip uninstall ffmpeg   
 pip install ffmpeg-python  
 ```
-我改了官方的diffuser支持，不支持官方支持的0.24版本，最好不要用0.24版的   
-这个方法的torch最高支持2.2.0，因为facenet_pytorch最高支持2.2.0，所以最要玩这个，最好是先卸载，再安装以上的python库。cu版本低的可以换成cu181     
-The torch of this method supports up to 2.2.0, because facenet_pytorch supports up to 2.2.0, so it is best to uninstall it first and then install the above Python libraries. The lower version of CU can be replaced with CU181     
+我改了官方的0.24版diffuser的限定，最好不要用0.24版的
+
+这个方法的torch最高支持2.2.0，因为facenet_pytorch最高支持2.2.0，所以最要玩这个，最好是先卸载，再安装以上的python库。cu版本低的可以换成cu118     
+The torch of this method supports up to 2.2.0, because facenet_pytorch supports up to 2.2.0, so it is best to uninstall it first and then install the above Python libraries. The lower version of CU can be replaced with CU118     
+
 缺啥装啥。。。  
 If the module is missing, , pip install  missing module.       
 
@@ -150,8 +176,6 @@ Using Pose-turbo
 |         ├── motion_module_pose_acc.pth
 |         ├── reference_unet_pose.pth
 ```
-
-
 
 Example
 -----
