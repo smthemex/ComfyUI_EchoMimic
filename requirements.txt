@@ -1,4 +1,3 @@
-facenet_pytorch
 ffmpeg-python
 mediapipe
 moviepy
