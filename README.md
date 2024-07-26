@@ -27,6 +27,10 @@ My ComfyUI node list：
 
 Update：
 ---
+2024/07/26
+-- 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，  
+--Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,
+
 2024/07/23
 --修复motion_sync不启用的bug，save_video现在默认关闭；  
 --Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;  
@@ -39,33 +43,35 @@ Update：
 
 Function Description
 --
-功能1：音频驱动视频生成，将pose_mode设置成无（none）时启用；   
-功能2：参考视频同步生成，同时生产pkl文件。需要将pose_mode设置成normal或turbo，开启motion_sync，在video_file选择你要同步的视频，设置pose_dir 为无（none）；   
-    --tips： 如果使用参考视频自带的音频，可以开始audio_from_video，此时audio输入的音频失效，此功能仅在motion_sync有效。   
-功能3：参考pkl模型文件，音频驱动视频，需要将pose_mode设置成normal或turbo,在pose_dir选择你要参考的pkl模型目录；   
-    --tips： 如果pose_dir为无（none），则使用内置的pkl模型，也就是插件目录的assets\test_pose_demo_pose；   
+--infer_mode：音频驱动视频生成，“audio_drived” 和"audio_drived_acc"；      
+--infer_mode：参考pkl模型文件视频pose生成 "pose_normal", "pose_acc"；   
+    ----motion_sync：如果打开且video_file有视频文件时，生成pkl文件，并生成参考视频的视频；pkl文件在input\tensorrt_lite 目录下，再次使用需要重启comfyUI。   
+    ----motion_sync：如果关闭且pose_mode不为none的时候，读取选定的pose_mode目录名的pkl文件，生成pose视频；如果pose_mode为空的时候，生成基于默认assets\test_pose_demo_pose的视频   
+    ----audio_from_video：仅在motion_sync开启，且video_file有视频文件时可用，可用提取video_file的视频文件的声音，请确保该视频有声音，且为mp4格式。  
+ 
 特别的选项：  
    --save_video：如果不想使用VH节点时，可以开启，默认关闭；     
    --draw_mouse：你可以试试；    
    --length：帧数，时长等于length/fps；     
-   --normal和turbo：turbo，6步可以，但是质量略有下降；   
+   --acc模型 ，6步就可以，但是质量略有下降；   
    --内置内置图片等比例裁切。   
 特别注意的地方：   
    --cfg数值设置为1，仅在turbo模式有效，其他会报错。    
 
-Function 1: Audio driven video generation, enabled when pose mode is set to none；   
-Function 2: Generate reference videos synchronously and produce PKL files at the same time. You need to set pose_mode to normal or turbo, enable motion_stync, select the video you want to synchronize in videoFILE, and set pose_dir to none；   
-    --Tip: If you use the audio provided in the reference video, you can start audio_from-video. At this point, the audio input will become invalid, and this function is only effective in motion_stync.
-Function 3: Refer to the pkl model file, drive the audio video, and set pose_mode to normal or turbo. Select the pkl model directory you want to refer to in pose_dir;  
-    --Tip: If pose_dir is none, use the built-in pkl model, which is assets \ test_pose_demo_pose in the plugin directory；   
+Infir_mode: Audio driven video generation, "audio-d rived" and "audio-d rived_acc";   
+Infer_rode: Refer to the PKL model file to generate "pose_normal" and "pose_acc" for the video pose;   
+Motion_Sync: If opened and there is a video file in videoFILE, generate a pkl file and generate a reference video for the video; The pkl file is located in the input \ sensorrt_lite directory. To use it again, you need to restart ComfyUI.    
+Motion_Sync: If turned off and pose_mode is not 'none', read the pkl file of the selected pose_mode directory name and generate a pose video; If pose_mode is empty, generate a video based on the default assets \ test_pose_demo_pose    
+Audio_from-video: Only available when motion_stync is enabled and videoFILE has video files, it can extract the sound from videoFILE's video files. Please ensure that the video has sound and is in mp4 format.   
+ 
 Special options:   
-    --Save_video: If you do not want to use VH nodes, you can turn it on, and it is turned off by default；  
-    --Draw_mouse: You can try it out；  
-    --Length: frame rate, duration equal to length/fps；  
-    --Normal and Turbo: Turbo, 6 steps are fine, but the quality has slightly decreased；  
-    --Built in image proportional cropping.   
+--Save_video: If you do not want to use VH nodes, it can be turned on and turned off by default;   
+--Draw_mause: You can try it out;   
+--Length: frame rate, duration equal to length/fps;   
+--The ACC model only requires 6 steps, but the quality has slightly decreased;   
+--Built in image proportional cropping.   
 Special attention should be paid to:   
-    --The cfg value is set to 1, which is only valid in turbo mode, otherwise an error will be reported. 
+--The cfg value is set to 1, which is only valid in turbo mode, otherwise an error will be reported.   
 
 
 1.Installation
@@ -110,14 +116,12 @@ python pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-ur
 python pip install xformers==0.0.24 --target"X:/XXX/XX/python_embeded/Lib/site-packages"
 ```
 other:
-diffuser >0.26 or 0.29 is best
 
 如果ffmpeg 报错，if ffmpeg error：  
 ```
 pip uninstall ffmpeg   
 pip install ffmpeg-python  
 ```
-我改了官方的0.24版diffuser的限定，最好不要用0.24版的
 
 这个方法的torch最高支持2.2.0，因为facenet_pytorch最高支持2.2.0，所以最要玩这个，最好是先卸载，再安装以上的python库。cu版本低的可以换成cu118     
 The torch of this method supports up to 2.2.0, because facenet_pytorch supports up to 2.2.0, so it is best to uninstall it first and then install the above Python libraries. The lower version of CU can be replaced with CU118     
@@ -128,10 +132,11 @@ If the module is missing, , pip install  missing module.
 3 Need  model 
 ----
 如果能直连抱脸,点击就会自动下载所需模型,不需要需下载.  
-
-Audio-Drived Algo Inference   
 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)  
 other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
+vae    
+stabilityai/sd-vae-ft-mse  [link](https://huggingface.co/stabilityai/sd-vae-ft-mse) 
+Audio-Drived Algo Inference  
 ```
 ├── ComfyUI/models/  
 |     ├──echo_mimic
@@ -145,8 +150,20 @@ other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)
 |         ├── motion_module.pth
 |         ├── reference_unet.pth
 ```
-vae    
-stabilityai/sd-vae-ft-mse  [link](https://huggingface.co/stabilityai/sd-vae-ft-mse) 
+Audio-Drived Algo Inference  acc
+```
+├── ComfyUI/models/  
+|     ├──echo_mimic
+|         ├── unet
+|             ├── diffusion_pytorch_model.bin
+|             ├── config.json
+|         ├── audio_processor
+|             ├── whisper_tiny.pt
+|         ├── denoising_unet_acc.pth
+|         ├── face_locator.pth
+|         ├── motion_module_acc.pth
+|         ├── reference_unet.pth
+```
 
 Using Pose-Drived Algo Inference  
 ```
@@ -162,7 +179,7 @@ Using Pose-Drived Algo Inference
 |         ├── motion_module_pose.pth
 |         ├── reference_unet_pose.pth
 ```
-Using Pose-turbo   
+Using Pose-Drived Algo Inference  ACC
 ```
 ├── ComfyUI/models/  
 |     ├──echo_mimic
@@ -179,13 +196,15 @@ Using Pose-turbo
 
 Example
 -----
-mormal Audio-Drived Algo Inference  workflow  音频驱动视频常规示例    
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/base.png)
+mormal Audio-Drived Algo Inference  workflow  音频驱动视频常规示例    最新版本示例
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/new.png)
 
-motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video 直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型  
+motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The old version 
+  
+直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型    旧版 
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_using_audio_from_video.png)
 
-pose from pkl, 基于预生成的pkl模型生成视频.  
+pose from pkl，The old version, 基于预生成的pkl模型生成视频.  旧版 
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/normal.png)
 
 
