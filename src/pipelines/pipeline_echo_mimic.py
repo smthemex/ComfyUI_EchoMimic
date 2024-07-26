@@ -417,9 +417,9 @@ class Audio2VideoPipeline(DiffusionPipeline):
             generator
         )
         # print(video_length, latents.shape)
-        face_locator_tensor = self.face_locator(face_mask_tensor)
-        uc_face_locator_tensor = torch.zeros_like(face_locator_tensor)
-        face_locator_tensor = torch.cat([uc_face_locator_tensor, face_locator_tensor], dim=0)
+        c_face_locator_tensor = self.face_locator(face_mask_tensor)
+        uc_face_locator_tensor = torch.zeros_like(c_face_locator_tensor)
+        face_locator_tensor = torch.cat([uc_face_locator_tensor, c_face_locator_tensor], dim=0)
         # Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
@@ -474,7 +474,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
                         encoder_hidden_states=None,
                         return_dict=False,
                     )
-                    reference_control_reader.update(reference_control_writer, do_classifier_free_guidance=True)
+                    reference_control_reader.update(reference_control_writer, do_classifier_free_guidance=do_classifier_free_guidance)
 
 
                 num_context_batches = math.ceil(len(context_queue) / context_batch_size)
@@ -498,8 +498,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
                         .to(device)
                         .repeat(2 if do_classifier_free_guidance else 1, 1, 1, 1, 1)
                     )
-                    audio_latents = torch.cat([audio_fea_final[:, c] for c in new_context]).to(device)
-                    audio_latents = torch.cat([torch.zeros_like(audio_latents), audio_latents], 0)
+                    c_audio_latents = torch.cat([audio_fea_final[:, c] for c in new_context]).to(device)
+                    audio_latents = torch.cat([torch.zeros_like(c_audio_latents), c_audio_latents], 0)
 
                     latent_model_input = self.scheduler.scale_model_input(
                         latent_model_input, t
@@ -508,8 +508,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
                         latent_model_input,
                         t,
                         encoder_hidden_states=None,
-                        audio_cond_fea=audio_latents,
-                        face_musk_fea=face_locator_tensor,
+                        audio_cond_fea=audio_latents if do_classifier_free_guidance else c_audio_latents,
+                        face_musk_fea=face_locator_tensor if do_classifier_free_guidance else c_face_locator_tensor,
                         return_dict=False,
                     )[0]
 
