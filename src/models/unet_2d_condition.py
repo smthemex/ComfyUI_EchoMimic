@@ -15,7 +15,15 @@ from diffusers.models.attention_processor import (
     AttnAddedKVProcessor,
     AttnProcessor,
 )
-from diffusers.models.embeddings import GLIGENTextBoundingboxProjection as PositionNet
+try:
+    from diffusers.models.embeddings import GLIGENTextBoundingboxProjection as PositionNet
+    
+except:
+    print("try other diffeser")
+    try:
+        from diffusers.models.embeddings import PositionNet
+    except:
+        raise "diffuser inport error"
 from diffusers.models.embeddings import (
     GaussianFourierProjection,
     ImageHintTimeEmbedding,
