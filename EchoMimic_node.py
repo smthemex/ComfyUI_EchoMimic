@@ -147,6 +147,8 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         face_mask = cv2.resize(face_mask, (width, height))
     
     ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
+    face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
+        0).unsqueeze(0) / 255.0
     audio = None
     if visualizer:
         #add face crop
@@ -166,9 +168,13 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
                              min(re + c_pad_crop, face_img.shape[0])]
                 print(crop_rect)
                 face_img, ori_face_rect = crop_and_pad(face_img, crop_rect)
+                face_mask, ori_face_mask_rect = crop_and_pad(face_mask, crop_rect)
                 print(ori_face_rect)
                 ori_face_size = (ori_face_rect[2] - ori_face_rect[0], ori_face_rect[3] - ori_face_rect[1])
                 face_img = cv2.resize(face_img, (width, height))
+                face_mask = cv2.resize(face_mask, (width, height))
+            else:
+                face_mask[:, :] = 255
         ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
         
         if pose_dir == "none":  # motion sync
@@ -195,9 +201,7 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
             pose_list.append(
                 torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
         face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-    else:
-        face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
-            0).unsqueeze(0) / 255.0
+        
     pipe = pipe.to("cuda", dtype=weight_dtype)
     video = pipe(
         ref_image_pil,
