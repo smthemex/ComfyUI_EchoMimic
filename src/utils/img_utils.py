@@ -19,18 +19,18 @@ def center_crop_cv2(cv2_pic):
     else:
         return cv2_pic[:, (w - h) // 2 : (w - h) // 2 + h]
 
-def pils_from_video(video_path):
+def pils_from_video(video_path,width, height): #直接cv流程，不需要转pil
     cap = cv2.VideoCapture(video_path)
-    pils = []
+    cv_img = []
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        frame = cv2.resize(center_crop_cv2(frame), (512, 512))
-        pils.append(cv2_to_pil(frame))
-
-    return pils
+        frame = cv2.resize(center_crop_cv2(frame), (width, height))
+        cv_img.append(frame)
+    cap.release()
+    return cv_img
 
 def save_videos_from_pils(pils, path, fps=24):
     width, height = pils[0].size
