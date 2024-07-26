@@ -2,11 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 import os
-import pickle
 import random
 import sys
-from pathlib import Path
-from shutil import copyfile, copy
 import cv2
 import numpy as np
 import torch
@@ -19,6 +16,7 @@ from .src.models.unet_2d_condition import UNet2DConditionModel
 from .src.models.unet_3d_echo import EchoUNet3DConditionModel
 from .src.models.whisper.audio2feature import load_audio_model
 from .src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
+from .src.pipelines.pipeline_echo_mimic_acc import Audio2VideoPipeline as Audio2VideoACCPipeline
 from .src.pipelines.pipeline_echo_mimic_pose import AudioPose2VideoPipeline
 from .src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline as AudioPose2VideoaccPipeline
 from .src.utils.util import save_videos_grid, crop_and_pad
@@ -29,10 +27,7 @@ from .src.utils.img_utils import pil_to_cv2, cv2_to_pil, center_crop_cv2, pils_f
 from .src.utils.motion_utils import motion_sync
 from moviepy.editor import VideoFileClip, AudioFileClip
 from facenet_pytorch import MTCNN
-import copy
-import pathlib
 import pickle
-from glob import glob
 import folder_paths
 from comfy.utils import common_upscale
 import platform
@@ -92,12 +87,7 @@ if ffmpeg_path is not None and ffmpeg_path not in os.getenv('PATH'):
     print("Adding FFMPEG_PATH to PATH")
     os.environ["PATH"] = f"{ffmpeg_path}:{os.environ['PATH']}"
     
-# config_path = os.path.join(current_path, "configs/prompts/animation.yaml")
-# config = OmegaConf.load(config_path)
-# if config.weight_dtype == "fp16":
-#     weight_dtype = torch.float16
-# else:
-#     weight_dtype = torch.float32
+
 weight_dtype = torch.float16
 
 device = "cuda"
@@ -121,8 +111,10 @@ def select_face(det_bboxes, probs):
     sorted_bboxes = sorted(filtered_bboxes, key=lambda x: (x[3] - x[1]) * (x[2] - x[0]), reverse=True)
     return sorted_bboxes[0]
 
+  
 def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
-                  facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device,pipe,face_detector,save_video,pose_dir,visualizer=None,):
+                  facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,pipe,face_detector,save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer=None,crop_face=True,):
+    
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
     else:
@@ -149,14 +141,50 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
         crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop), min(ce + c_pad_crop, face_img.shape[1]),
                      min(re + r_pad_crop, face_img.shape[0])]
-        face_img = crop_and_pad(face_img, crop_rect)
-        face_mask = crop_and_pad(face_mask, crop_rect)
+        face_img, ori_face_rect_a = crop_and_pad(face_img, crop_rect)
+        face_mask, ori_mask_rect_b = crop_and_pad(face_mask, crop_rect)  #ori_face_rect_a,ori_mask_rect_b no use
         face_img = cv2.resize(face_img, (width, height))
         face_mask = cv2.resize(face_mask, (width, height))
     
     ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
-    
+    audio = None
     if visualizer:
+        #add face crop
+        if crop_face:
+            face_img = np.array(uploaded_img)
+            face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
+            det_bboxes, probs = face_detector.detect(face_img)
+            select_bbox = select_face(det_bboxes, probs)
+            if select_bbox is not None:
+                xyxy = select_bbox[:4].astype(float)  # 原方法的np版本 无法实现整形
+                xyxy = np.round(xyxy).astype('int')
+                rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
+                r_pad_crop = int((re - rb) * facecrop_dilation_ratio)
+                c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
+                crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop),
+                             min(ce + c_pad_crop, face_img.shape[1]),
+                             min(re + c_pad_crop, face_img.shape[0])]
+                print(crop_rect)
+                face_img, ori_face_rect = crop_and_pad(face_img, crop_rect)
+                print(ori_face_rect)
+                ori_face_size = (ori_face_rect[2] - ori_face_rect[0], ori_face_rect[3] - ori_face_rect[1])
+                face_img = cv2.resize(face_img, (width, height))
+        ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
+        
+        if pose_dir == "none":  # motion sync
+            if video_files != "none":
+                pose_dir, audio_from_v = motion_sync_main(visualizer, width, height, video_files, face_img,
+                                                          audio_form_video, audio_file_prefix)
+                if audio_form_video:
+                    uploaded_audio = audio_from_v
+                    waveform, sample_rate = torchaudio.load(uploaded_audio)
+                    audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
+            else:
+                pose_dir = os.path.join(current_path, "assets", "test_pose_demo_pose")  # default
+        else:
+            pose_dir = os.path.join(tensorrt_lite, pose_dir)
+        
+        
         pose_list = []
         for index in range(len(os.listdir(pose_dir))):
             tgt_musk_path = os.path.join(pose_dir, f"{index}.pkl")
@@ -167,11 +195,10 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
             pose_list.append(
                 torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
         face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-        ref_image_pil=uploaded_img.convert("RGB")
     else:
         face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
             0).unsqueeze(0) / 255.0
-    
+    pipe = pipe.to("cuda", dtype=weight_dtype)
     video = pipe(
         ref_image_pil,
         uploaded_audio,
@@ -187,11 +214,15 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         fps=fps,
         context_overlap=context_overlap
     ).videos
-    filename_prefix = ''.join(random.choice("0123456789") for _ in range(5))
-    output_file = os.path.join(folder_paths.output_directory, f"{filename_prefix}_echo.mp4")
+    
+    final_length = min(video.shape[2], face_mask_tensor.shape[2], length)
+    
+    output_file = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_echo.mp4")
+    
     ouput_list = save_videos_grid(video, output_file, n_rows=1, fps=fps, save_video=save_video)
+    
     if save_video:
-        output_video_path=os.path.join(folder_paths.output_directory,f"{filename_prefix}_audio.mp4")
+        output_video_path=os.path.join(folder_paths.output_directory,f"{audio_file_prefix}_audio.mp4")
         video_clip = VideoFileClip(output_file)
         audio_clip = AudioFileClip(uploaded_audio)
         final_clip = video_clip.set_audio(audio_clip)
@@ -202,8 +233,8 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         video_clip.reader.close()
         audio_clip.close()
         final_clip.reader.close()
-    return ouput_list
-
+        
+    return ouput_list,audio
 
 def download_weights(file_dir,repo_id,subfolder="",pt_name=""):
     if subfolder:
@@ -252,11 +283,26 @@ def narry_list(list_in):
     return list_in
 
 def get_video_img(tensor):
+    if tensor==None:
+        return None
     outputs = []
     for x in tensor:
         x = tensor_to_pil(x)
         outputs.append(x)
-    return outputs
+    yield outputs
+
+
+def gen_img_form_video(tensor):
+    pil=[]
+    for x in tensor:
+       pil[x]=tensor_to_pil(x)
+    yield pil
+    
+def phi_list(list_in):
+    for i in range(len(list_in)):
+        value = list_in[i]
+        list_in[i] = value
+    return list_in
 
 
 def nomarl_upscale(img_tensor, width, height):
@@ -301,39 +347,24 @@ def instance_path(path, repo):
     return repo
 
 
-def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
-    # vis = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True,
-    #                          draw_pupil=True)
-    
-    imsize = (width, height)
+def motion_sync_main(vis,width, height,driver_video,face_img,audio_form_video,audio_file_prefix):
 
-    driver_video=os.path.join(folder_paths.input_directory,driver_video)
-    image_name = "temp_" + ''.join(random.choice("0123456789") for _ in range(5))
-    # base origin video
+    lmk_extractor = LMKExtractor()
+    ref_det = lmk_extractor(face_img)
+    audio_path = None
+    driver_video = os.path.join(folder_paths.input_directory, driver_video)
+    
     if audio_form_video:
-        audio_path=os.path.join(folder_paths.input_directory,f"{image_name}_audio.wav")
+        audio_path = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_audio.wav")
         video_clip = VideoFileClip(driver_video)
         audio_clip = video_clip.audio
         audio_clip.write_audiofile(audio_path)
         video_clip.close()
         audio_clip.close()
-    else:
-        audio_path=None
+        
+    input_frames_cv2 = [i for i in pils_from_video(driver_video,width, height)] #原方法 先cv，中心剪裁转pil，再转cv再中心剪裁，然后再pil转CV很奇怪
     
-    face_img = np.array(image)
-    face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
-    
-   
-    ref_image = os.path.join(tensorrt_lite, f"{image_name}.png")
-    image.save(ref_image)
-    
-    lmk_extractor = LMKExtractor()
-    
-    input_frames_cv2 = [cv2.resize(center_crop_cv2(pil_to_cv2(i)), imsize) for i in pils_from_video(driver_video)]
-    ref_frame = cv2.resize(face_img, (width, height))
-    ref_det = lmk_extractor(ref_frame)
     # print(ref_det)
-    
     sequence_driver_det = []
     try:
         for frame in input_frames_cv2:
@@ -342,21 +373,36 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
             sequence_driver_det.append(result)
     except:
         print("face detection failed")
-        exit()
-    print(len(sequence_driver_det))
+        
+    print("motion sync lenght " f"{len(sequence_driver_det)}")
     
     if vis:
         pose_frames_driver = [vis.draw_landmarks((width, height), i["lmks"], normed=True) for i in sequence_driver_det]
         poses_add_driver = [(i * 0.5 + j * 0.5).clip(0, 255).astype(np.uint8) for i, j in
                             zip(input_frames_cv2, pose_frames_driver)]
     
-    save_dir=os.path.join(tensorrt_lite,image_name)
-    os.makedirs(save_dir, exist_ok=True)
+    save_dir=os.path.join(tensorrt_lite,audio_file_prefix)
+    save_dir=os.path.normpath(save_dir)
     
-    sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
-    for i in range(len(sequence_det_ms)):
-        with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
-            pickle.dump(sequence_det_ms[i], file)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
+        for i in range(len(sequence_det_ms)):
+            with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
+                pickle.dump(sequence_det_ms[i], file)
+        print(f"motion_sync {save_dir} is done")
+    else: #同名文件
+        files_ex=os.path.join(save_dir,"0.pkl")
+        files_ex=os.path.normpath(files_ex)
+        if not os.path.isfile(files_ex):#判断是否有模型文件
+            sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
+            for i in range(len(sequence_det_ms)):
+                with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
+                    pickle.dump(sequence_det_ms[i], file)
+            print(f"motion_sync {save_dir} is done")
+        else:
+            print("The model file already exists ")
+        
     # if vis:
     #     pose_frames = [vis.draw_landmarks((width, height), i, normed=False) for i in sequence_det_ms]
     #     poses_add = [(i * 0.5 + ref_frame * 0.5).clip(0, 255).astype(np.uint8) for i in pose_frames]
@@ -365,7 +411,6 @@ def motion_sync_main(vis,width, height,driver_video,image,audio_form_video):
     # output_video_path = os.path.join(folder_paths.output_directory, f"{image_name}_.mp4")
     # if save_video:
     #     save_video_from_cv2_list(poses_cat, output_video_path, fps=fps)
-
     return  save_dir,audio_path
 
 
@@ -379,18 +424,18 @@ class Echo_LoadModel:
             "required": {
                 "vae":("STRING", {"default": "stabilityai/sd-vae-ft-mse"}),
                 "denoising":("BOOLEAN", {"default": True},),
-                "pose_mode": (["none","normal", "turbo"],),
+                "infer_mode": (["audio_drived","audio_drived_acc","pose_normal", "pose_acc"],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync": ("BOOLEAN", {"default": False},),
             }
         }
 
     RETURN_TYPES = ("MODEL","MODEL","MODEL",)
-    RETURN_NAMES = ("model","face_detector","visualizer")
+    RETURN_NAMES = ("model","face_detector","visualizer",)
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
 
-    def main_loader(self,vae,denoising,pose_mode,draw_mouse,motion_sync):
+    def main_loader(self,vae,denoising,infer_mode,draw_mouse,motion_sync):
  
         ############# model_init started #############
         ## vae init
@@ -404,31 +449,39 @@ class Echo_LoadModel:
         audio_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", subfolder="audio_processor",
                                     pt_name="whisper_tiny.pt")
         
-        if pose_mode=="normal":
+       #pre pth
+        if infer_mode=="pose_normal":
             re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                               pt_name="face_locator_pose.pth")
             motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_pose.pth")
             denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose.pth")
-            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator_pose.pth")
-        elif pose_mode=="turbo":
+            
+        elif infer_mode=="pose_acc":
             re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
             motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic",
                                            pt_name="motion_module_pose_acc.pth")
             denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose_acc.pth")
             face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
                                                pt_name="face_locator_pose.pth")
-        else:
+        elif infer_mode == "audio_drived":
             re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
             motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module.pth")
             denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet.pth")
+        else:
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
             face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_acc.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_acc.pth")
         
        
-        reference_unet = UNet2DConditionModel.from_config(
+        reference_unet = UNet2DConditionModel.from_pretrained(
             pretrained_base_model_path,
             subfolder="unet",
         ).to(dtype=weight_dtype, device=device)
 
-        reference_unet.load_state_dict(torch.load(re_ckpt, map_location="cpu"))
+        reference_unet.load_state_dict(torch.load(re_ckpt, map_location="cpu"),strict=False)
         
         ## denoising net init
         if denoising:
@@ -464,19 +517,20 @@ class Echo_LoadModel:
             ).to(dtype=weight_dtype, device=device)
         
         denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
-        if pose_mode!="none":
+        if infer_mode =="pose_normal" or infer_mode =="pose_acc":
             # face locator init
             face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
                 dtype=weight_dtype, device="cuda")
-            face_locator.load_state_dict(torch.load(face_locator_pt))
-            visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=draw_mouse)
+            face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
             if motion_sync:
                 visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True, draw_pupil=True)
+            else:
+                visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=draw_mouse)
         else:
             # face locator init
             face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
                 dtype=weight_dtype, device="cuda")
-            face_locator.load_state_dict(torch.load(face_locator_pt))
+            face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
             visualizer = None
         
         ## load audio processor params
@@ -487,10 +541,11 @@ class Echo_LoadModel:
                               post_process=True, device=device)
         
         ############# model_init finished #############
-    
+        
         sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
         scheduler = DDIMScheduler(**sched_kwargs)
-        if pose_mode=="normal":
+        
+        if infer_mode=="pose_normal":
             pipe = AudioPose2VideoPipeline(
                 vae=vae,
                 reference_unet=reference_unet,
@@ -499,7 +554,7 @@ class Echo_LoadModel:
                 face_locator=face_locator,
                 scheduler=scheduler,
             ).to("cuda", dtype=weight_dtype)
-        elif pose_mode=="turbo":
+        elif infer_mode=="pose_acc":
             pipe = AudioPose2VideoaccPipeline(
                 vae=vae,
                 reference_unet=reference_unet,
@@ -508,7 +563,7 @@ class Echo_LoadModel:
                 face_locator=face_locator,
                 scheduler=scheduler,
             ).to("cuda", dtype=weight_dtype)
-        else:
+        elif infer_mode=="audio_drived":
             pipe = Audio2VideoPipeline(
                 vae=vae,
                 reference_unet=reference_unet,
@@ -517,8 +572,16 @@ class Echo_LoadModel:
                 face_locator=face_locator,
                 scheduler=scheduler,
             ).to("cuda", dtype=weight_dtype)
-       
-        return (pipe,face_detector,visualizer)
+        else:
+            pipe = Audio2VideoACCPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to("cuda", dtype=weight_dtype)
+        return (pipe,face_detector,visualizer,)
     
 
 class Echo_Sampler:
@@ -544,6 +607,7 @@ class Echo_Sampler:
                 "facecrop_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "context_frames": ("INT", {"default": 12, "min": 0, "max": 50}),
                 "context_overlap": ("INT", {"default": 3, "min": 0, "max": 10}),
+                "crop_face" :("BOOLEAN", {"default": True},),
                 "length": ("INT", {"default": 120, "min": 100, "max": 5000, "step": 1, "display": "number"}),
                 "width": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "height": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
@@ -558,35 +622,22 @@ class Echo_Sampler:
     FUNCTION = "em_main"
     CATEGORY = "EchoMimic"
     
-    def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,length,
+    def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
                     width, height,audio_form_video,save_video,**kwargs):
         image=nomarl_upscale(image,width, height)
-        #image=tensor_to_pil(image)
         visualizer = kwargs.get("visualizer")
-        audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(5))
-        audio_file = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_temp.wav")
+        audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
+        audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
         torchaudio.save(audio_file, audio["waveform"].squeeze(0), sample_rate=audio["sample_rate"])
-        
-        if visualizer: #pose
-            if pose_dir=="none": #motion sync
-                if video_files!="none":
-                    pose_dir, audio_from_v = motion_sync_main(visualizer, width, height, video_files, image,
-                                                              audio_form_video)
-                    if audio_form_video:
-                        audio_file = audio_from_v
-                        waveform, sample_rate = torchaudio.load(audio_from_v)
-                        audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
-                else:
-                    pose_dir = os.path.join(current_path, "assets", "test_pose_demo_pose")  # default
-            else:
-                pose_dir = get_instance_path(os.path.join(tensorrt_lite, pose_dir))
-              
-        output_video = process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
+        output_video,audio_form_v= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
                                      facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
-                                     device, pipe, face_detector, save_video,pose_dir, visualizer)
+                                    pipe, face_detector, save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer,crop_face,)
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
         frame_rate=float(fps)
+        if audio_form_video:
+            audio=audio_form_v
+        torch.cuda.empty_cache()
         return (images,audio,frame_rate)
 
 
