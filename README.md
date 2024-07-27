@@ -28,6 +28,9 @@ My ComfyUI node list：
 Update：
 ---
 2024/07/26
+--解决可能是batch图片输入的错误。
+
+2024/07/26
 -- 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，  
 --Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,
 
