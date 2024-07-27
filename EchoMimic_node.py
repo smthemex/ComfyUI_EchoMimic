@@ -628,7 +628,13 @@ class Echo_Sampler:
     
     def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
                     width, height,audio_form_video,save_video,**kwargs):
-        image=nomarl_upscale(image,width, height)
+        #防止batch img输入引发的tensor缩放错误
+        d1, _, _, _ = image.size()
+        if d1 == 1:
+            image = nomarl_upscale(image, width, height)
+        else:
+            img_list = list(torch.chunk(image, chunks=d1))
+            image = [nomarl_upscale(img, width, height) for img in img_list][0]
         visualizer = kwargs.get("visualizer")
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
         audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
