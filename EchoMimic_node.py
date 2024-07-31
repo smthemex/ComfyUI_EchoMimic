@@ -46,6 +46,10 @@ if not os.path.exists(weigths_current_path):
 weigths_uet_current_path = os.path.join(weigths_current_path, "unet")
 if not os.path.exists(weigths_uet_current_path):
     os.makedirs(weigths_uet_current_path)
+    
+weigths_vae_current_path = os.path.join(weigths_current_path, "vae")
+if not os.path.exists(weigths_uet_current_path):
+    os.makedirs(weigths_uet_current_path)
 
 weigths_au_current_path = os.path.join(weigths_current_path, "audio_processor")
 if not os.path.exists(weigths_au_current_path):
@@ -442,8 +446,22 @@ class Echo_LoadModel:
     def main_loader(self,vae,denoising,infer_mode,draw_mouse,motion_sync):
  
         ############# model_init started #############
-        ## vae init
-        vae = AutoencoderKL.from_pretrained(vae).to("cuda", dtype=weight_dtype)
+        
+        ## vae init  #using local vae first
+        try:
+            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to("cuda", dtype=weight_dtype) #using local vae first
+        except:
+            try: #try downlaod model ,and load local vae
+                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
+                                 pt_name="diffusion_pytorch_model.safetensors")
+                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",pt_name="config.json")
+                vae=AutoencoderKL.from_pretrained(weigths_vae_current_path).to("cuda",dtype=weight_dtype)
+            except:
+                try:
+                    vae = AutoencoderKL.from_pretrained(vae).to("cuda", dtype=weight_dtype)
+                except:
+                    raise "vae load error"
+
         ## reference net init
         pretrained_base_model_path=get_instance_path(weigths_current_path)
         
