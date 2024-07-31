@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
-
+import io
 import os
 import random
 import sys
@@ -656,7 +656,11 @@ class Echo_Sampler:
         visualizer = kwargs.get("visualizer")
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
         audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
-        torchaudio.save(audio_file, audio["waveform"].squeeze(0), sample_rate=audio["sample_rate"])
+        # 减少音频数据传递导致的不必要文件存储
+        buff = io.BytesIO()
+        torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
+        with open(audio_file, 'wb') as f:
+            f.write(buff.getbuffer())
         output_video,audio_form_v= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
                                      facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
                                     pipe, face_detector, save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer,crop_face,)
