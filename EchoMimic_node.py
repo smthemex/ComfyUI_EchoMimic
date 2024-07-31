@@ -498,10 +498,19 @@ class Echo_LoadModel:
             denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_acc.pth")
         
        
-        reference_unet = UNet2DConditionModel.from_pretrained(
-            pretrained_base_model_path,
-            subfolder="unet",
-        ).to(dtype=weight_dtype, device=device)
+        try:
+            reference_unet = UNet2DConditionModel.from_config(
+                pretrained_base_model_path,
+                subfolder="unet",
+            ).to(dtype=weight_dtype)
+        except:
+            try:
+                reference_unet = UNet2DConditionModel.from_pretrained(
+                    pretrained_base_model_path,
+                    subfolder="unet",
+                ).to(dtype=weight_dtype)
+            except:
+                raise "diffusers error"
 
         reference_unet.load_state_dict(torch.load(re_ckpt, map_location="cpu"),strict=False)
         
