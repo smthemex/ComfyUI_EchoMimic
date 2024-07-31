@@ -24,9 +24,13 @@ My ComfyUI node list：
 15、ComfyUI_AnyDoor node: [ComfyUI_AnyDoor](https://github.com/smthemex/ComfyUI_AnyDoor)  
 16、ComfyUI_Stable_Makeup node: [ComfyUI_Stable_Makeup](https://github.com/smthemex/ComfyUI_Stable_Makeup)  
 17、ComfyUI_EchoMimic node:  [ComfyUI_EchoMimic](https://github.com/smthemex/ComfyUI_EchoMimic)   
+18、ComfyUI_FollowYourEmoji node:  [ComfyUI_FollowYourEmoji](https://github.com/smthemex/ComfyUI_FollowYourEmoji) 
 
 Update：
 ---
+2024/07/31   
+--修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。  
+
 2024/07/26
 --解决可能是batch图片输入的错误。
 
@@ -134,12 +138,11 @@ If the module is missing, , pip install  missing module.
 
 3 Need  model 
 ----
-如果能直连抱脸,点击就会自动下载所需模型,不需要需下载.  
+如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)  
 other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
-vae    
-stabilityai/sd-vae-ft-mse  [link](https://huggingface.co/stabilityai/sd-vae-ft-mse) 
-Audio-Drived Algo Inference  
+vae(stabilityai/sd-vae-ft-mse)    [link](https://huggingface.co/stabilityai/sd-vae-ft-mse)     
+Audio-Drived Algo Inference     
 ```
 ├── ComfyUI/models/  
 |     ├──echo_mimic
@@ -148,6 +151,9 @@ Audio-Drived Algo Inference
 |             ├── config.json
 |         ├── audio_processor
 |             ├── whisper_tiny.pt
+|         ├── vae
+|             ├── diffusion_pytorch_model.safetensors
+|             ├── config.json
 |         ├── denoising_unet.pth
 |         ├── face_locator.pth
 |         ├── motion_module.pth
@@ -162,6 +168,9 @@ Audio-Drived Algo Inference  acc
 |             ├── config.json
 |         ├── audio_processor
 |             ├── whisper_tiny.pt
+|         ├── vae
+|             ├── diffusion_pytorch_model.safetensors
+|             ├── config.json
 |         ├── denoising_unet_acc.pth
 |         ├── face_locator.pth
 |         ├── motion_module_acc.pth
@@ -177,6 +186,9 @@ Using Pose-Drived Algo Inference
 |             ├── config.json
 |         ├── audio_processor
 |             ├── whisper_tiny.pt
+|         ├── vae
+|             ├── diffusion_pytorch_model.safetensors
+|             ├── config.json
 |         ├── denoising_unet_pose.pth
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose.pth
@@ -191,6 +203,9 @@ Using Pose-Drived Algo Inference  ACC
 |             ├── config.json
 |         ├── audio_processor
 |             ├── whisper_tiny.pt
+|         ├── vae
+|             ├── diffusion_pytorch_model.safetensors
+|             ├── config.json
 |         ├── denoising_unet_pose_acc.pth
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose_acc.pth
