@@ -28,23 +28,19 @@ My ComfyUI node list：
 
 Update：
 ---
-2024/07/31   
+2024/08/01   
+--添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
+--Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
+
+既往更新/Previous updates：    
 --修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。  
-
-2024/07/26
 --解决可能是batch图片输入的错误。
-
-2024/07/26
 -- 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，  
---Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,
-
-2024/07/23
---修复motion_sync不启用的bug，save_video现在默认关闭；  
---Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;  
-
-2024/07/21   
+--修复motion_sync不启用的bug，save_video现在默认关闭；
 --修复模型下载的路径定义错误，修复pkl文件路径存放的错误；  
 --将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
+--Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,
+--Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;  
 --Fix the incorrect path definition for model download and the error in storing the pkl file path;  
 --Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)   
 
@@ -61,6 +57,7 @@ Function Description
    --draw_mouse：你可以试试；    
    --length：帧数，时长等于length/fps；     
    --acc模型 ，6步就可以，但是质量略有下降；   
+   --lowvram :低显存用户可以开启 lowvram users can enable it  
    --内置内置图片等比例裁切。   
 特别注意的地方：   
    --cfg数值设置为1，仅在turbo模式有效，其他会报错。    
@@ -214,8 +211,8 @@ Using Pose-Drived Algo Inference  ACC
 
 Example
 -----
-mormal Audio-Drived Algo Inference  workflow  音频驱动视频常规示例    最新版本示例
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/new.png)
+mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例   最新版本示例
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/example.png)
 
 motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The old version 
   
