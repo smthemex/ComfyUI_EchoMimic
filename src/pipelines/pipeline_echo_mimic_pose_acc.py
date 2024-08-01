@@ -89,15 +89,15 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
 
         device = torch.device(f"cuda:{gpu_id}")
 
-        for cpu_offloaded_model in [self.unet, self.text_encoder, self.vae]:
+        for cpu_offloaded_model in [self.reference_unet,self.denoising_unet, self.text_encoder,]:
             if cpu_offloaded_model is not None:
                 cpu_offload(cpu_offloaded_model, device)
 
     @property
     def _execution_device(self):
-        if self.device != torch.device("meta") or not hasattr(self.unet, "_hf_hook"):
+        if self.device != torch.device("meta") or not hasattr(self.reference_unet, "_hf_hook"):
             return self.device
-        for module in self.unet.modules():
+        for module in self.reference_unet.modules():
             if (
                 hasattr(module, "_hf_hook")
                 and hasattr(module._hf_hook, "execution_device")
