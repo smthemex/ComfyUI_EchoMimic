@@ -73,7 +73,6 @@ else:
     pose_path_list_=["none",]
 
 
-
 ffmpeg_path = os.getenv('FFMPEG_PATH')
 if ffmpeg_path is None and platform.system() in ['Linux', 'Darwin']:
     try:
@@ -206,7 +205,6 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
                 torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
         face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
         
-    pipe = pipe.to("cuda", dtype=weight_dtype)
     video = pipe(
         ref_image_pil,
         uploaded_audio,
@@ -435,6 +433,7 @@ class Echo_LoadModel:
                 "infer_mode": (["audio_drived","audio_drived_acc","pose_normal", "pose_acc"],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync": ("BOOLEAN", {"default": False},),
+                "lowvram":("BOOLEAN", {"default": False},),
             }
         }
 
@@ -443,22 +442,22 @@ class Echo_LoadModel:
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
 
-    def main_loader(self,vae,denoising,infer_mode,draw_mouse,motion_sync):
+    def main_loader(self,vae,denoising,infer_mode,draw_mouse,motion_sync,lowvram):
  
         ############# model_init started #############
         
         ## vae init  #using local vae first
         try:
-            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to("cuda", dtype=weight_dtype) #using local vae first
+            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype) #using local vae first
         except:
             try: #try downlaod model ,and load local vae
                 download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
                                  pt_name="diffusion_pytorch_model.safetensors")
                 download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",pt_name="config.json")
-                vae=AutoencoderKL.from_pretrained(weigths_vae_current_path).to("cuda",dtype=weight_dtype)
+                vae=AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype)
             except:
                 try:
-                    vae = AutoencoderKL.from_pretrained(vae).to("cuda", dtype=weight_dtype)
+                    vae = AutoencoderKL.from_pretrained(vae).to(device,dtype=weight_dtype)
                 except:
                     raise "vae load error"
 
@@ -522,7 +521,7 @@ class Echo_LoadModel:
                     motion_path,
                     subfolder="unet",
                     unet_additional_kwargs=infer_config.unet_additional_kwargs,
-                ).to(dtype=weight_dtype, device=device)
+                ).to(dtype=weight_dtype)
             else:
                 denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
                     pretrained_base_model_path,
@@ -533,7 +532,7 @@ class Echo_LoadModel:
                         "unet_use_temporal_attention": False,
                         "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
                     }
-                ).to(dtype=weight_dtype, device=device)
+                ).to(dtype=weight_dtype, )
         else:
             ### only stage1
             denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
@@ -545,13 +544,13 @@ class Echo_LoadModel:
                     "unet_use_temporal_attention": False,
                     "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
                 }
-            ).to(dtype=weight_dtype, device=device)
+            ).to(dtype=weight_dtype,)
         
         denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
         if infer_mode =="pose_normal" or infer_mode =="pose_acc":
             # face locator init
             face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
-                dtype=weight_dtype, device="cuda")
+                dtype=weight_dtype, device=device)
             face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
             if motion_sync:
                 visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True, draw_pupil=True)
@@ -560,7 +559,7 @@ class Echo_LoadModel:
         else:
             # face locator init
             face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
-                dtype=weight_dtype, device="cuda")
+                dtype=weight_dtype, device=device)
             face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
             visualizer = None
         
@@ -569,7 +568,7 @@ class Echo_LoadModel:
         
         ## load face detector params
         face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
-                              post_process=True, device=device)
+                              post_process=True,device=device)
         
         ############# model_init finished #############
         
@@ -584,7 +583,7 @@ class Echo_LoadModel:
                 audio_guider=audio_processor,
                 face_locator=face_locator,
                 scheduler=scheduler,
-            ).to("cuda", dtype=weight_dtype)
+            ).to(dtype=weight_dtype)
         elif infer_mode=="pose_acc":
             pipe = AudioPose2VideoaccPipeline(
                 vae=vae,
@@ -593,7 +592,7 @@ class Echo_LoadModel:
                 audio_guider=audio_processor,
                 face_locator=face_locator,
                 scheduler=scheduler,
-            ).to("cuda", dtype=weight_dtype)
+            ).to( dtype=weight_dtype)
         elif infer_mode=="audio_drived":
             pipe = Audio2VideoPipeline(
                 vae=vae,
@@ -602,7 +601,7 @@ class Echo_LoadModel:
                 audio_guider=audio_processor,
                 face_locator=face_locator,
                 scheduler=scheduler,
-            ).to("cuda", dtype=weight_dtype)
+            ).to( dtype=weight_dtype)
         else:
             pipe = Audio2VideoACCPipeline(
                 vae=vae,
@@ -611,7 +610,13 @@ class Echo_LoadModel:
                 audio_guider=audio_processor,
                 face_locator=face_locator,
                 scheduler=scheduler,
-            ).to("cuda", dtype=weight_dtype)
+            ).to(dtype=weight_dtype)
+            
+        pipe.enable_vae_slicing()
+        if lowvram:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to(device)
         return (pipe,face_detector,visualizer,)
     
 
