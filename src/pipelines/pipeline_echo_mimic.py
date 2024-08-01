@@ -63,7 +63,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
         text_encoder=None,
     ):
         super().__init__()
-
+        
         self.register_modules(
             vae=vae,
             reference_unet=reference_unet,
@@ -80,7 +80,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
         self.ref_image_processor = VaeImageProcessor(
             vae_scale_factor=self.vae_scale_factor, do_convert_rgb=True
         )
-
+        
     def enable_vae_slicing(self):
         self.vae.enable_slicing()
 
@@ -95,15 +95,15 @@ class Audio2VideoPipeline(DiffusionPipeline):
 
         device = torch.device(f"cuda:{gpu_id}")
 
-        for cpu_offloaded_model in [self.unet, self.text_encoder, self.vae]:
+        for cpu_offloaded_model in [self.reference_unet,self.denoising_unet, self.text_encoder,]:
             if cpu_offloaded_model is not None:
                 cpu_offload(cpu_offloaded_model, device)
 
     @property
     def _execution_device(self):
-        if self.device != torch.device("meta") or not hasattr(self.unet, "_hf_hook"):
+        if self.device != torch.device("meta") or not hasattr(self.reference_unet, "_hf_hook"):
             return self.device
-        for module in self.unet.modules():
+        for module in self.reference_unet.modules():
             if (
                 hasattr(module, "_hf_hook")
                 and hasattr(module._hf_hook, "execution_device")
@@ -370,7 +370,6 @@ class Audio2VideoPipeline(DiffusionPipeline):
         device = self._execution_device
 
         do_classifier_free_guidance = guidance_scale > 1.0
-
         # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = self.scheduler.timesteps
@@ -391,9 +390,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
             batch_size=batch_size,
             fusion_blocks="full",
         )
-
+        
         whisper_feature = self.audio_guider.audio2feat(audio_path)
-
         whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
 
         print("whisper_chunks:", whisper_chunks.shape)
