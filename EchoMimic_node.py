@@ -48,8 +48,8 @@ if not os.path.exists(weigths_uet_current_path):
     os.makedirs(weigths_uet_current_path)
     
 weigths_vae_current_path = os.path.join(weigths_current_path, "vae")
-if not os.path.exists(weigths_uet_current_path):
-    os.makedirs(weigths_uet_current_path)
+if not os.path.exists(weigths_vae_current_path):
+    os.makedirs(weigths_vae_current_path)
 
 weigths_au_current_path = os.path.join(weigths_current_path, "audio_processor")
 if not os.path.exists(weigths_au_current_path):
