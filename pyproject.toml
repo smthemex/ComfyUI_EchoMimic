@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_echomimic"
+description = "You can using EchoMimic in comfyui,whitch Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning "
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["xformers==0.0.24", "torch==2.2.0", "torchvision==0.17.0", "torchaudio==2.2.0", "facenet_pytorch", "ffmpeg-python"]
+
+[project.urls]
+Repository = "https://github.com/smthemex/ComfyUI_EchoMimic"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI_EchoMimic"
+Icon = ""
