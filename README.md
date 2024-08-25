@@ -133,6 +133,28 @@ The torch of this method supports up to 2.2.0, because facenet_pytorch supports 
 缺啥装啥。。。  
 If the module is missing, , pip install  missing module.       
 
+
+## Troubleshooting errors with stable-audio-tools / other audio issues
+```
+**If using conda & python >3.12**
+// Uninstall all & downgrade python
+
+pip uninstall torchaudio torchvision torch xformers ffmpeg
+
+conda uninstall python
+conda install python=3.11.9
+
+pip install --upgrade pip wheel
+conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+
+python -m pip install xformers==0.0.24 
+pip install git+https://github.com/stability-ai/stable-audio-tools.git
+// Should have most of these packages if you install the custom nodes from git urls
+pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbytes omegaconf decord carvekit insightface easydict open_clip ffmpeg-python taming onnxruntime
+
+Delete PBR_Maker node (throws error on server start as git repo is empty).
+```
+
 3 Need  model 
 ----
 如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
