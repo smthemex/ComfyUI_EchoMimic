@@ -24,68 +24,76 @@ My ComfyUI node list：
 15、ComfyUI_AnyDoor node: [ComfyUI_AnyDoor](https://github.com/smthemex/ComfyUI_AnyDoor)  
 16、ComfyUI_Stable_Makeup node: [ComfyUI_Stable_Makeup](https://github.com/smthemex/ComfyUI_Stable_Makeup)  
 17、ComfyUI_EchoMimic node:  [ComfyUI_EchoMimic](https://github.com/smthemex/ComfyUI_EchoMimic)   
-18、ComfyUI_FollowYourEmoji node:  [ComfyUI_FollowYourEmoji](https://github.com/smthemex/ComfyUI_FollowYourEmoji) 
+18、ComfyUI_FollowYourEmoji node:  [ComfyUI_FollowYourEmoji](https://github.com/smthemex/ComfyUI_FollowYourEmoji)   
+19. ComfyUI-VideoHelperSuite node: [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
-Update：
 ---
-2024/08/01   
---添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
---Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
+## Updates:
+**2024/08/01**     
+* Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully     
 
-既往更新/Previous updates：    
---修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。  
---解决可能是batch图片输入的错误。
--- 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，  
---修复motion_sync不启用的bug，save_video现在默认关闭；
---修复模型下载的路径定义错误，修复pkl文件路径存放的错误；  
---将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
---Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,
---Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;  
---Fix the incorrect path definition for model download and the error in storing the pkl file path;  
---Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)   
+**Previous updates：**     
+* Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,   
+* Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;     
+* Fix the incorrect path definition for model download and the error in storing the pkl file path;     
+* Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)      
 
-Function Description
---
+---
+* 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。        
+**既往更新：**   
+* 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
+* 解决可能是batch图片输入的错误。   
+* 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，     
+* 修复motion_sync不启用的bug，save_video现在默认关闭；   
+* 修复模型下载的路径定义错误，修复pkl文件路径存放的错误；     
+* 将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）     
+
+---
+
+## Function Description
+
 --infer_mode：音频驱动视频生成，“audio_drived” 和"audio_drived_acc"；      
 --infer_mode：参考pkl模型文件视频pose生成 "pose_normal", "pose_acc"；   
     ----motion_sync：如果打开且video_file有视频文件时，生成pkl文件，并生成参考视频的视频；pkl文件在input\tensorrt_lite 目录下，再次使用需要重启comfyUI。   
     ----motion_sync：如果关闭且pose_mode不为none的时候，读取选定的pose_mode目录名的pkl文件，生成pose视频；如果pose_mode为空的时候，生成基于默认assets\test_pose_demo_pose的视频   
     ----audio_from_video：仅在motion_sync开启，且video_file有视频文件时可用，可用提取video_file的视频文件的声音，请确保该视频有声音，且为mp4格式。  
  
-特别的选项：  
+**特别的选项**：  
    --save_video：如果不想使用VH节点时，可以开启，默认关闭；     
    --draw_mouse：你可以试试；    
    --length：帧数，时长等于length/fps；     
    --acc模型 ，6步就可以，但是质量略有下降；   
    --lowvram :低显存用户可以开启 lowvram users can enable it  
    --内置内置图片等比例裁切。   
-特别注意的地方：   
+**特别注意的地方**：   
    --cfg数值设置为1，仅在turbo模式有效，其他会报错。    
 
-Infir_mode: Audio driven video generation, "audio-d rived" and "audio-d rived_acc";   
-Infer_rode: Refer to the PKL model file to generate "pose_normal" and "pose_acc" for the video pose;   
-Motion_Sync: If opened and there is a video file in videoFILE, generate a pkl file and generate a reference video for the video; The pkl file is located in the input \ sensorrt_lite directory. To use it again, you need to restart ComfyUI.    
-Motion_Sync: If turned off and pose_mode is not 'none', read the pkl file of the selected pose_mode directory name and generate a pose video; If pose_mode is empty, generate a video based on the default assets \ test_pose_demo_pose    
-Audio_from-video: Only available when motion_stync is enabled and videoFILE has video files, it can extract the sound from videoFILE's video files. Please ensure that the video has sound and is in mp4 format.   
+---
+
+**Infir_mode**: Audio driven video generation, "audio-d rived" and "audio-d rived_acc";   
+**Infer_rode**: Refer to the PKL model file to generate "pose_normal" and "pose_acc" for the video pose;   
+**Motion_Sync**: If opened and there is a video file in videoFILE, generate a pkl file and generate a reference video for the video; The pkl file is located in the input \ sensorrt_lite directory. To use it again, you need to restart ComfyUI.    
+**Motion_Sync**: If turned off and pose_mode is not 'none', read the pkl file of the selected pose_mode directory name and generate a pose video; If pose_mode is empty, generate a video based on the default assets \ test_pose_demo_pose    
+**Audio_from**-video: Only available when motion_stync is enabled and videoFILE has video files, it can extract the sound from videoFILE's video files. Please ensure that the video has sound and is in mp4 format.   
  
-Special options:   
---Save_video: If you do not want to use VH nodes, it can be turned on and turned off by default;   
---Draw_mause: You can try it out;   
---Length: frame rate, duration equal to length/fps;   
+### Special options:   
+--**Save_video**: If you do not want to use VH nodes, it can be turned on and turned off by default;   
+--**Draw_mause**: You can try it out;   
+--**Length**: frame rate, duration equal to length/fps;   
 --The ACC model only requires 6 steps, but the quality has slightly decreased;   
 --Built in image proportional cropping.   
 Special attention should be paid to:   
 --The cfg value is set to 1, which is only valid in turbo mode, otherwise an error will be reported.   
 
 
-1.Installation
+# 1. Installation
 -----
-  In the ./ComfyUI /custom_node directory, run the following:   
+In the ./ComfyUI /custom_node directory, run the following:   
 ```
 git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 ```  
   
-2.requirements  
+# 2. Requirements  
 ----
 ```
 pip install -r requirements.txt
@@ -135,10 +143,9 @@ If the module is missing, , pip install  missing module.
 
 
 ## Troubleshooting errors with stable-audio-tools / other audio issues
-```
 **If using conda & python >3.12**
-// Uninstall all & downgrade python
-
+> Uninstall all & downgrade python
+```
 pip uninstall torchaudio torchvision torch xformers ffmpeg
 
 conda uninstall python
@@ -149,13 +156,18 @@ conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=
 
 python -m pip install xformers==0.0.24 
 pip install git+https://github.com/stability-ai/stable-audio-tools.git
-// Should have most of these packages if you install the custom nodes from git urls
-pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbytes omegaconf decord carvekit insightface easydict open_clip ffmpeg-python taming onnxruntime
-
-Delete PBR_Maker node (throws error on server start as git repo is empty).
 ```
+**Should have most of these packages if you install the custom nodes from git urls**
+```
+pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbytes omegaconf decord carvekit insightface easydict open_clip ffmpeg-python taming onnxruntime
+```
+***⚠️ Delete PBR_Maker node (git repo is empty and causes error on ComfyUI start).***
 
-3 Need  model 
+---
+
+
+
+# 3. Models Required 
 ----
 如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)  
