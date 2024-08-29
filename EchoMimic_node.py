@@ -32,9 +32,6 @@ import folder_paths
 from comfy.utils import common_upscale
 import platform
 import subprocess
-from chineseProjUtils import pmo, pme, setTitle, unsetTitle
-import contextlib
-
 
 
 MAX_SEED = np.iinfo(np.int32).max
@@ -446,103 +443,86 @@ class Echo_LoadModel:
     CATEGORY = "EchoMimic"
 
     def main_loader(self,vae,denoising,infer_mode,draw_mouse,motion_sync,lowvram):
-        import time
+ 
         ############# model_init started #############
-        with contextlib.redirect_stdout(pmo), contextlib.redirect_stderr(pme):
-        ## vae init  #using local vae first
-            try:
-                setTitle("加载VAE模型")
-                vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype) #using local vae first
-            except:
-                try: #try downlaod model ,and load local vae
-                    setTitle("下载VAE模型")
-                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
-                                    pt_name="diffusion_pytorch_model.safetensors")
-                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",pt_name="config.json")
-                    vae=AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype)
-                except:
-                    try:
-                        vae = AutoencoderKL.from_pretrained(vae).to(device,dtype=weight_dtype)
-                    except:
-                        raise "vae load error"
-
-            ## reference net init
-            pretrained_base_model_path=get_instance_path(weigths_current_path)
-            
-            #pre models
-            setTitle("下载diffusion_pytorch模型")
-            download_weights(weigths_current_path,"lambdalabs/sd-image-variations-diffusers",subfolder="unet",pt_name="diffusion_pytorch_model.bin")
-            download_weights(weigths_current_path,"lambdalabs/sd-image-variations-diffusers",subfolder="unet",pt_name="config.json")
-            setTitle("下载whisper_tiny模型")
-            audio_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", subfolder="audio_processor",
-                                        pt_name="whisper_tiny.pt")
-            
-        #pre pth
-            setTitle("下载推断过程相关模型")
-            if infer_mode=="pose_normal":
-                re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
-                face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
-                                                pt_name="face_locator_pose.pth")
-                motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_pose.pth")
-                denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose.pth")
-                
-            elif infer_mode=="pose_acc":
-                re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
-                motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic",
-                                            pt_name="motion_module_pose_acc.pth")
-                denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose_acc.pth")
-                face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
-                                                pt_name="face_locator_pose.pth")
-            elif infer_mode == "audio_drived":
-                re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
-                face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
-                motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module.pth")
-                denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet.pth")
-            else:
-                re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
-                face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
-                motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_acc.pth")
-                denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_acc.pth")
-            
         
+        ## vae init  #using local vae first
+        try:
+            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype) #using local vae first
+        except:
+            try: #try downlaod model ,and load local vae
+                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
+                                 pt_name="diffusion_pytorch_model.safetensors")
+                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",pt_name="config.json")
+                vae=AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype)
+            except:
+                try:
+                    vae = AutoencoderKL.from_pretrained(vae).to(device,dtype=weight_dtype)
+                except:
+                    raise "vae load error"
+
+        ## reference net init
+        pretrained_base_model_path=get_instance_path(weigths_current_path)
+        
+        #pre models
+        download_weights(weigths_current_path,"lambdalabs/sd-image-variations-diffusers",subfolder="unet",pt_name="diffusion_pytorch_model.bin")
+        download_weights(weigths_current_path,"lambdalabs/sd-image-variations-diffusers",subfolder="unet",pt_name="config.json")
+        audio_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", subfolder="audio_processor",
+                                    pt_name="whisper_tiny.pt")
+        
+       #pre pth
+        if infer_mode=="pose_normal":
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                               pt_name="face_locator_pose.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_pose.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose.pth")
+            
+        elif infer_mode=="pose_acc":
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet_pose.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                           pt_name="motion_module_pose_acc.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_pose_acc.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
+                                               pt_name="face_locator_pose.pth")
+        elif infer_mode == "audio_drived":
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet.pth")
+        else:
+            re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="reference_unet.pth")
+            face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="face_locator.pth")
+            motion_path = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="motion_module_acc.pth")
+            denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic", pt_name="denoising_unet_acc.pth")
+        
+       
+        try:
+            reference_unet = UNet2DConditionModel.from_config(
+                pretrained_base_model_path,
+                subfolder="unet",
+            ).to(dtype=weight_dtype)
+        except:
             try:
-                reference_unet = UNet2DConditionModel.from_config(
+                reference_unet = UNet2DConditionModel.from_pretrained(
                     pretrained_base_model_path,
                     subfolder="unet",
                 ).to(dtype=weight_dtype)
             except:
-                try:
-                    reference_unet = UNet2DConditionModel.from_pretrained(
-                        pretrained_base_model_path,
-                        subfolder="unet",
-                    ).to(dtype=weight_dtype)
-                except:
-                    raise "diffusers error"
+                raise "diffusers error"
 
-            reference_unet.load_state_dict(torch.load(re_ckpt, map_location="cpu"),strict=False)
-            
-            ## denoising net init
-            if denoising:
-                if os.path.exists(motion_path): ### stage1 + stage2
-                    denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-                        pretrained_base_model_path,
-                        motion_path,
-                        subfolder="unet",
-                        unet_additional_kwargs=infer_config.unet_additional_kwargs,
-                    ).to(dtype=weight_dtype)
-                else:
-                    denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-                        pretrained_base_model_path,
-                        "",
-                        subfolder="unet",
-                        unet_additional_kwargs={
-                            "use_motion_module": False,
-                            "unet_use_temporal_attention": False,
-                            "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
-                        }
-                    ).to(dtype=weight_dtype, )
+        reference_unet.load_state_dict(torch.load(re_ckpt, map_location="cpu"),strict=False)
+        
+        ## denoising net init
+        if denoising:
+            if os.path.exists(motion_path): ### stage1 + stage2
+                denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
+                    pretrained_base_model_path,
+                    motion_path,
+                    subfolder="unet",
+                    unet_additional_kwargs=infer_config.unet_additional_kwargs,
+                ).to(dtype=weight_dtype)
             else:
-                ### only stage1
                 denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
                     pretrained_base_model_path,
                     "",
@@ -552,80 +532,91 @@ class Echo_LoadModel:
                         "unet_use_temporal_attention": False,
                         "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
                     }
-                ).to(dtype=weight_dtype,)
-            
-            denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
-            if infer_mode =="pose_normal" or infer_mode =="pose_acc":
-                # face locator init
-                face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
-                    dtype=weight_dtype, device=device)
-                face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
-                if motion_sync:
-                    visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True, draw_pupil=True)
-                else:
-                    visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=draw_mouse)
+                ).to(dtype=weight_dtype, )
+        else:
+            ### only stage1
+            denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
+                pretrained_base_model_path,
+                "",
+                subfolder="unet",
+                unet_additional_kwargs={
+                    "use_motion_module": False,
+                    "unet_use_temporal_attention": False,
+                    "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
+                }
+            ).to(dtype=weight_dtype,)
+        
+        denoising_unet.load_state_dict(torch.load(denois_pt, map_location="cpu"), strict=False)
+        if infer_mode =="pose_normal" or infer_mode =="pose_acc":
+            # face locator init
+            face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
+                dtype=weight_dtype, device=device)
+            face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
+            if motion_sync:
+                visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True, draw_eyebrow=True, draw_pupil=True)
             else:
-                # face locator init
-                face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
-                    dtype=weight_dtype, device=device)
-                face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
-                visualizer = None
+                visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=draw_mouse)
+        else:
+            # face locator init
+            face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
+                dtype=weight_dtype, device=device)
+            face_locator.load_state_dict(torch.load(face_locator_pt),strict=False)
+            visualizer = None
+        
+        ## load audio processor params
+        audio_processor = load_audio_model(model_path=audio_pt, device=device)
+        
+        ## load face detector params
+        face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
+                              post_process=True,device=device)
+        
+        ############# model_init finished #############
+        
+        sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
+        scheduler = DDIMScheduler(**sched_kwargs)
+        
+        if infer_mode=="pose_normal":
+            pipe = AudioPose2VideoPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to(dtype=weight_dtype)
+        elif infer_mode=="pose_acc":
+            pipe = AudioPose2VideoaccPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to( dtype=weight_dtype)
+        elif infer_mode=="audio_drived":
+            pipe = Audio2VideoPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to( dtype=weight_dtype)
+        else:
+            pipe = Audio2VideoACCPipeline(
+                vae=vae,
+                reference_unet=reference_unet,
+                denoising_unet=denoising_unet,
+                audio_guider=audio_processor,
+                face_locator=face_locator,
+                scheduler=scheduler,
+            ).to(dtype=weight_dtype)
             
-            ## load audio processor params
-            audio_processor = load_audio_model(model_path=audio_pt, device=device)
-            
-            ## load face detector params
-            face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
-                                post_process=True,device=device)
-            
-            ############# model_init finished #############
-            
-            sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
-            scheduler = DDIMScheduler(**sched_kwargs)
-            
-            if infer_mode=="pose_normal":
-                pipe = AudioPose2VideoPipeline(
-                    vae=vae,
-                    reference_unet=reference_unet,
-                    denoising_unet=denoising_unet,
-                    audio_guider=audio_processor,
-                    face_locator=face_locator,
-                    scheduler=scheduler,
-                ).to(dtype=weight_dtype)
-            elif infer_mode=="pose_acc":
-                pipe = AudioPose2VideoaccPipeline(
-                    vae=vae,
-                    reference_unet=reference_unet,
-                    denoising_unet=denoising_unet,
-                    audio_guider=audio_processor,
-                    face_locator=face_locator,
-                    scheduler=scheduler,
-                ).to( dtype=weight_dtype)
-            elif infer_mode=="audio_drived":
-                pipe = Audio2VideoPipeline(
-                    vae=vae,
-                    reference_unet=reference_unet,
-                    denoising_unet=denoising_unet,
-                    audio_guider=audio_processor,
-                    face_locator=face_locator,
-                    scheduler=scheduler,
-                ).to( dtype=weight_dtype)
-            else:
-                pipe = Audio2VideoACCPipeline(
-                    vae=vae,
-                    reference_unet=reference_unet,
-                    denoising_unet=denoising_unet,
-                    audio_guider=audio_processor,
-                    face_locator=face_locator,
-                    scheduler=scheduler,
-                ).to(dtype=weight_dtype)
-                
-            pipe.enable_vae_slicing()
-            if lowvram:
-                pipe.enable_sequential_cpu_offload()
-            else:
-                pipe.to(device)
-            unsetTitle()
+        pipe.enable_vae_slicing()
+        if lowvram:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to(device)
         return (pipe,face_detector,visualizer,)
     
 
@@ -670,32 +661,29 @@ class Echo_Sampler:
     def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
                     width, height,audio_form_video,save_video,**kwargs):
         #防止batch img输入引发的tensor缩放错误
-        with contextlib.redirect_stdout(pmo), contextlib.redirect_stderr(pme):
-            setTitle("正在生成视频")
-            d1, _, _, _ = image.size()
-            if d1 == 1:
-                image = nomarl_upscale(image, width, height)
-            else:
-                img_list = list(torch.chunk(image, chunks=d1))
-                image = [nomarl_upscale(img, width, height) for img in img_list][0]
-            visualizer = kwargs.get("visualizer")
-            audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
-            audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
-            # 减少音频数据传递导致的不必要文件存储
-            buff = io.BytesIO()
-            torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
-            with open(audio_file, 'wb') as f:
-                f.write(buff.getbuffer())
-            output_video,audio_form_v= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
-                                        facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
-                                        pipe, face_detector, save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer,crop_face,)
-            gen = narry_list(output_video)  # pil列表排序
-            images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
-            frame_rate=float(fps)
-            if audio_form_video:
-                audio=audio_form_v
-            torch.cuda.empty_cache()
-            unsetTitle()
+        d1, _, _, _ = image.size()
+        if d1 == 1:
+            image = nomarl_upscale(image, width, height)
+        else:
+            img_list = list(torch.chunk(image, chunks=d1))
+            image = [nomarl_upscale(img, width, height) for img in img_list][0]
+        visualizer = kwargs.get("visualizer")
+        audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
+        audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
+        # 减少音频数据传递导致的不必要文件存储
+        buff = io.BytesIO()
+        torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
+        with open(audio_file, 'wb') as f:
+            f.write(buff.getbuffer())
+        output_video,audio_form_v= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
+                                     facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
+                                    pipe, face_detector, save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer,crop_face,)
+        gen = narry_list(output_video)  # pil列表排序
+        images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
+        frame_rate=float(fps)
+        if audio_form_video:
+            audio=audio_form_v
+        torch.cuda.empty_cache()
         return (images,audio,frame_rate)
 
 
