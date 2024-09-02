@@ -206,16 +206,16 @@ Example
 -----
 示例的VH node ComfyUI-VideoHelperSuite node: [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
-mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例   最新版本示例
+mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例   最新版本示例 
 ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/example.png)
 
 motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The old version 
   
-直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型    旧版 
+直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型    旧版    
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_using_audio_from_video.png)
 
-pose from pkl，The old version, 基于预生成的pkl模型生成视频.  旧版 
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/normal.png)
+pose from pkl，The old version, 基于预生成的pkl模型生成视频.  旧版      
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/new.png)
 
 
 ---
