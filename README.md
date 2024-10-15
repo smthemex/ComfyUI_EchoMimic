@@ -57,13 +57,13 @@ torch2.4
 ```
 pip uninstall torchaudio torchvision torch xformers
 pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-pip install xformers xformers==0.0.26
+pip install xformers==0.0.27.post2
 ```
 torch2.3  
 ```
 pip uninstall torchaudio torchvision torch xformers
 pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
-pip install xformers==0.0.26  
+pip install xformers==0.0.26.post1
 ```
 
 如果安装 opencv-python 后comfyUI无法正常打开，请按以下命令先卸载，再安装：     
