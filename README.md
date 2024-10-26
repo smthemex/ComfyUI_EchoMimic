@@ -7,32 +7,10 @@ EchoMimicin  From: [EchoMimic](https://github.com/BadToBest/EchoMimic/tree/main)
 
 ---
 ## Updates:
-**2024/09/02**    
-* After successfully installing the latest OpenCV Python library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch torch vision torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
-* 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
-```
-pip uninstall torchaudio torchvision torch xformers
-pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-pip install  xformers
-```
+**2024/10/26**    
+* 新增hallo2的2倍放大节点，输入视频的尺寸必须是512*512方形，输出为1024*1024
+
    
-**Previous updates：**   
-* Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
-* Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,   
-* Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;     
-* Fix the incorrect path definition for model download and the error in storing the pkl file path;     
-* Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)      
-
----
-**既往更新：**   
-* 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
-* 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
-* 解决可能是batch图片输入的错误。   
-* 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，     
-* 修复motion_sync不启用的bug，save_video现在默认关闭；   
-* 修复模型下载的路径定义错误，修复pkl文件路径存放的错误；     
-* 将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）     
-
 # 1. Installation
 -----
 In the ./ComfyUI /custom_node directory, run the following:   
@@ -44,63 +22,29 @@ git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 ----
 ```
 pip install -r requirements.txt
-pip install opencv-python
+pip install --no-deps opencv-python 
 ```
 Notice
 ---
-opencv-python的最高支持版本是torch 2.2.0,,如果你的torch版本较高,首次安装时, 可以用--no-deps torch 忽略torch的安装 ,或者直接安装,然后删掉torch再安装高版本的torch,
-如果是便携包，需要在python_embeded目录下，运行python -m pip install XXX 或者python -m pip uninstall XXX，以下是示例:
-
-The highest supported version of OpenCV Python is Torch 2.2.0. If your Torch version is higher, during the first installation, you can use -- no deps Torch to ignore the installation of Torch, or install it directly, then delete Torch and install a higher version of Torch,
-If it is a portable package, you need to run python - m pip install XXX or python - m pip uninstall XXX in the python-embedded directory. Here is an example:
-torch2.4  
+if comfyUI  broken after pip  install  opencv-python ,try this below:     
+如果安装opencv-python后comfyUI奔溃，可以先卸载torch，然后再重新安装，以下版本只是示例：  
 ```
 pip uninstall torchaudio torchvision torch xformers
 pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-pip install xformers==0.0.27.post2
+pip install xformers
 ```
-torch2.3  
+如果使用的是便携包版本 comfyUI If it is a portable package comfyUI：
+在python_embeded目录下，打卡CMD：open CMD in python_embeded dir
 ```
-pip uninstall torchaudio torchvision torch xformers
-pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
-pip install xformers==0.0.26.post1
+python -m pip uninstall torchaudio torchvision torch xformers
+python -m pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
+python -m pip install xformers
 ```
-
-如果安装 opencv-python 后comfyUI无法正常打开，请按以下命令先卸载，再安装：     
-If comfyUI cannot be opened properly after installing OpenCV Python, please uninstall it first and then install it using the following command:       
-```
-pip uninstall torchaudio torchvision torch xformers      
-pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121   
-pip install xformers==0.0.24   
-```
-如果是便携包， 需要在python_embeded目录下，运行python -m pip install XXX 或者python -m pip uninstall XXX，以下是示例   
-if using python_embeded comfyUI,need in python_embeded open CMD ,and python -m pip install python_embeded，   
-```
-python -m pip uninstall torchaudio torchvision torch xformers   
-python -m pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121   
-python -m pip install xformers==0.0.24   
-```
-or 或者  
-delete python_embeded/Lib/site-packages name"torchaudio,torchvision,torch,xformers "dir     
-或者直接删除python_embeded/Lib/site-packages 下面的torchaudio,torchvision,torch,xformers目录，然后按以下命令安装：     
-```
-python pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121 --target"X:/XXX/XX/python_embeded/Lib/site-packages"
-python pip install xformers==0.0.24 --target"X:/XXX/XX/python_embeded/Lib/site-packages"
-```
-other:
 
 如果ffmpeg 报错，if ffmpeg error：  
 ```
 pip uninstall ffmpeg   
 pip install ffmpeg-python  
-```
-
-* After successfully installing the latest OpenCV Python library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch torch vision torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
-* 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
-```
-pip uninstall torchaudio torchvision torch xformers
-pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-pip install  xformers
 ```
 
 其他库缺啥装啥。。。  
@@ -132,10 +76,10 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)  
 other  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
 vae(stabilityai/sd-vae-ft-mse)    [link](https://huggingface.co/stabilityai/sd-vae-ft-mse)     
-Audio-Drived Algo Inference     
+hallo upscale [huggingface](https://huggingface.co/fudan-generative-ai/hallo2/tree/main)
+
 ```
-├── ComfyUI/models/  
-|     ├──echo_mimic
+├── ComfyUI/models/ echo_mimic
 |         ├── unet
 |             ├── diffusion_pytorch_model.bin
 |             ├── config.json
@@ -144,23 +88,18 @@ Audio-Drived Algo Inference
 |         ├── vae
 |             ├── diffusion_pytorch_model.safetensors
 |             ├── config.json
+
+```
+Audio-Drived Algo Inference     
+```
+├── ComfyUI/models/ echo_mimic
 |         ├── denoising_unet.pth
 |         ├── face_locator.pth
 |         ├── motion_module.pth
 |         ├── reference_unet.pth
 ```
 Audio-Drived Algo Inference  acc
-```
-├── ComfyUI/models/  
-|     ├──echo_mimic
-|         ├── unet
-|             ├── diffusion_pytorch_model.bin
-|             ├── config.json
-|         ├── audio_processor
-|             ├── whisper_tiny.pt
-|         ├── vae
-|             ├── diffusion_pytorch_model.safetensors
-|             ├── config.json
+├── ComfyUI/models/ echo_mimic
 |         ├── denoising_unet_acc.pth
 |         ├── face_locator.pth
 |         ├── motion_module_acc.pth
@@ -169,16 +108,7 @@ Audio-Drived Algo Inference  acc
 
 Using Pose-Drived Algo Inference  
 ```
-├── ComfyUI/models/  
-|     ├──echo_mimic
-|         ├── unet
-|             ├── diffusion_pytorch_model.bin
-|             ├── config.json
-|         ├── audio_processor
-|             ├── whisper_tiny.pt
-|         ├── vae
-|             ├── diffusion_pytorch_model.safetensors
-|             ├── config.json
+├── ComfyUI/models/ echo_mimic
 |         ├── denoising_unet_pose.pth
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose.pth
@@ -186,16 +116,7 @@ Using Pose-Drived Algo Inference
 ```
 Using Pose-Drived Algo Inference  ACC
 ```
-├── ComfyUI/models/  
-|     ├──echo_mimic
-|         ├── unet
-|             ├── diffusion_pytorch_model.bin
-|             ├── config.json
-|         ├── audio_processor
-|             ├── whisper_tiny.pt
-|         ├── vae
-|             ├── diffusion_pytorch_model.safetensors
-|             ├── config.json
+├── ComfyUI/models/ echo_mimic
 |         ├── denoising_unet_pose_acc.pth
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose_acc.pth
@@ -206,8 +127,8 @@ Example
 -----
 示例的VH node ComfyUI-VideoHelperSuite node: [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
-mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例   最新版本示例 
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/example.png)
+mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例  2倍放大 1024*1024  最新版本示例 
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/echonew.png)
 
 motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The old version 
   
@@ -255,33 +176,30 @@ pose from pkl，The old version, 基于预生成的pkl模型生成视频.  旧�
 Special attention should be paid to:   
 --The cfg value is set to 1, which is only valid in turbo mode, otherwise an error will be reported.   
 
-My ComfyUI node list：
------
-1、ParlerTTS node:[ComfyUI_ParlerTTS](https://github.com/smthemex/ComfyUI_ParlerTTS)     
-2、Llama3_8B node:[ComfyUI_Llama3_8B](https://github.com/smthemex/ComfyUI_Llama3_8B)      
-3、HiDiffusion node：[ComfyUI_HiDiffusion_Pro](https://github.com/smthemex/ComfyUI_HiDiffusion_Pro)   
-4、ID_Animator node： [ComfyUI_ID_Animator](https://github.com/smthemex/ComfyUI_ID_Animator)       
-5、StoryDiffusion node：[ComfyUI_StoryDiffusion](https://github.com/smthemex/ComfyUI_StoryDiffusion)  
-6、Pops node：[ComfyUI_Pops](https://github.com/smthemex/ComfyUI_Pops)   
-7、stable-audio-open-1.0 node ：[ComfyUI_StableAudio_Open](https://github.com/smthemex/ComfyUI_StableAudio_Open)        
-8、GLM4 node：[ComfyUI_ChatGLM_API](https://github.com/smthemex/ComfyUI_ChatGLM_API)   
-9、CustomNet node：[ComfyUI_CustomNet](https://github.com/smthemex/ComfyUI_CustomNet)           
-10、Pipeline_Tool node :[ComfyUI_Pipeline_Tool](https://github.com/smthemex/ComfyUI_Pipeline_Tool)    
-11、Pic2Story node :[ComfyUI_Pic2Story](https://github.com/smthemex/ComfyUI_Pic2Story)   
-12、PBR_Maker node:[ComfyUI_PBR_Maker](https://github.com/smthemex/ComfyUI_PBR_Maker)      
-13、ComfyUI_Streamv2v_Plus node:[ComfyUI_Streamv2v_Plus](https://github.com/smthemex/ComfyUI_Streamv2v_Plus)   
-14、ComfyUI_MS_Diffusion node:[ComfyUI_MS_Diffusion](https://github.com/smthemex/ComfyUI_MS_Diffusion)   
-15、ComfyUI_AnyDoor node: [ComfyUI_AnyDoor](https://github.com/smthemex/ComfyUI_AnyDoor)  
-16、ComfyUI_Stable_Makeup node: [ComfyUI_Stable_Makeup](https://github.com/smthemex/ComfyUI_Stable_Makeup)  
-17、ComfyUI_EchoMimic node:  [ComfyUI_EchoMimic](https://github.com/smthemex/ComfyUI_EchoMimic)   
-18、ComfyUI_FollowYourEmoji node: [ComfyUI_FollowYourEmoji](https://github.com/smthemex/ComfyUI_FollowYourEmoji)   
-19、ComfyUI_Diffree node: [ComfyUI_Diffree](https://github.com/smthemex/ComfyUI_Diffree)    
-20、ComfyUI_FoleyCrafter node: [ComfyUI_FoleyCrafter](https://github.com/smthemex/ComfyUI_FoleyCrafter)   
-21、ComfyUI_MooER: [ComfyUI_MooER](https://github.com/smthemex/ComfyUI_MooER)  
 
+**Previous updates：**   
+* After successfully installing the latest OpenCV Python library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch torch vision torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
+* Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
+* Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,   
+* Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;     
+* Fix the incorrect path definition for model download and the error in storing the pkl file path;     
+* Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)      
+
+---
+**既往更新：**   
+
+* 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
+* 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
+* 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
+* 解决可能是batch图片输入的错误。   
+* 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，     
+* 修复motion_sync不启用的bug，save_video现在默认关闭；   
+* 修复模型下载的路径定义错误，修复pkl文件路径存放的错误；     
+* 将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
 
 6 Citation
 ------
+EchoMimicin
 ``` python  
 @misc{chen2024echomimic,
   title={EchoMimic: Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning},
@@ -289,6 +207,17 @@ My ComfyUI node list：
   year={2024},
   archivePrefix={arXiv},
   primaryClass={cs.CV}
+}
+```
+hallo2
+```
+@misc{cui2024hallo2,
+	title={Hallo2: Long-Duration and High-Resolution Audio-driven Portrait Image Animation},
+	author={Jiahao Cui and Hui Li and Yao Yao and Hao Zhu and Hanlin Shang and Kaihui Cheng and Hang Zhou and Siyu Zhu and️ Jingdong Wang},
+	year={2024},
+	eprint={2410.07718},
+	archivePrefix={arXiv},
+	primaryClass={cs.CV}
 }
 ```
 

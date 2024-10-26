@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_echomimic"
+description = "ou can using EchoMimic in comfyui,please using pip install install miss module"
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["ffmpeg-python", "mediapipe", "moviepy", "IPython", "av"]
+
+[project.urls]
+Repository = "https://github.com/smthemex/ComfyUI_EchoMimic"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "smthemex"
+DisplayName = "ComfyUI_EchoMimic"
+Icon = ""
