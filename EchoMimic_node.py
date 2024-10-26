@@ -3,15 +3,11 @@
 import io
 import os
 import random
-import sys
-import cv2
 import numpy as np
 import torch
 import torchaudio
 from diffusers import AutoencoderKL,DDIMScheduler
-from huggingface_hub import hf_hub_download
 from omegaconf import OmegaConf
-from PIL import Image
 from .src.models.unet_2d_condition import UNet2DConditionModel
 from .src.models.unet_3d_echo import EchoUNet3DConditionModel
 from .src.models.whisper.audio2feature import load_audio_model
@@ -19,29 +15,41 @@ from .src.pipelines.pipeline_echo_mimic import Audio2VideoPipeline
 from .src.pipelines.pipeline_echo_mimic_acc import Audio2VideoPipeline as Audio2VideoACCPipeline
 from .src.pipelines.pipeline_echo_mimic_pose import AudioPose2VideoPipeline
 from .src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline as AudioPose2VideoaccPipeline
-from .src.utils.util import save_videos_grid, crop_and_pad
 from .src.models.face_locator import FaceLocator
 from .src.utils.draw_utils import FaceMeshVisualizer
-from .src.utils.mp_utils  import LMKExtractor
-from .src.utils.img_utils import pil_to_cv2, cv2_to_pil, center_crop_cv2, pils_from_video, save_videos_from_pils, save_video_from_cv2_list
 from .src.utils.motion_utils import motion_sync
-from moviepy.editor import VideoFileClip, AudioFileClip
+from .utils import load_images,tensor2cv,find_directories,nomarl_upscale,download_weights,get_instance_path,process_video,narry_list,weight_dtype
+from .hallo.video_sr import run_realesrgan,pre_u_loader
 from facenet_pytorch import MTCNN
-import pickle
+from pathlib import Path
+from huggingface_hub import hf_hub_download
 import folder_paths
-from comfy.utils import common_upscale
 import platform
 import subprocess
 
 
 MAX_SEED = np.iinfo(np.int32).max
+device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 current_path = os.path.dirname(os.path.abspath(__file__))
-node_path_dir = os.path.dirname(current_path)
-comfy_file_path = os.path.dirname(node_path_dir)
-weigths_current_path = os.path.join(folder_paths.models_dir, "echo_mimic")
+inference_config_path = os.path.join(current_path,"configs","inference","inference_v2.yaml")
+infer_config = OmegaConf.load(inference_config_path)
 
+weigths_hallo_current_path = os.path.join(folder_paths.models_dir, "Hallo")
+if not os.path.exists(weigths_hallo_current_path):
+    os.makedirs(weigths_hallo_current_path)
+
+try:
+    folder_paths.add_model_folder_path("Hallo", weigths_hallo_current_path, False)
+except:
+    folder_paths.add_model_folder_path("Hallo", weigths_hallo_current_path)
+
+
+#pre dir
+weigths_current_path = os.path.join(folder_paths.models_dir, "echo_mimic")
 if not os.path.exists(weigths_current_path):
     os.makedirs(weigths_current_path)
+    
+   
     
 weigths_uet_current_path = os.path.join(weigths_current_path, "unet")
 if not os.path.exists(weigths_uet_current_path):
@@ -55,24 +63,21 @@ weigths_au_current_path = os.path.join(weigths_current_path, "audio_processor")
 if not os.path.exists(weigths_au_current_path):
     os.makedirs(weigths_au_current_path)
 
-tensorrt_lite= os.path.join(folder_paths.input_directory,"tensorrt_lite")
+tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
 if not os.path.exists(tensorrt_lite):
     os.makedirs(tensorrt_lite)
+    
+#upscale dir
+weigths_facelib_path = os.path.join(weigths_hallo_current_path, "facelib")
+if not os.path.exists(weigths_hallo_current_path):
+    os.makedirs(weigths_facelib_path)
 
-def find_directories(base_path):
-    directories = []
-    for root, dirs, files in os.walk(base_path):
-        for name in dirs:
-            directories.append(name)
-    return directories
-   
-pose_path_list = find_directories(tensorrt_lite)
-if pose_path_list:
-    pose_path_list_=["none"]+pose_path_list
-else:
-    pose_path_list_=["none",]
+weigths_face_analysis_path = os.path.join(weigths_hallo_current_path, "face_analysis/models")
+weigths_face_analysis_dir = os.path.join(weigths_hallo_current_path, "face_analysis")
+if not os.path.exists(weigths_face_analysis_path):
+    os.makedirs(weigths_face_analysis_path)
 
-
+# ffmpeg
 ffmpeg_path = os.getenv('FFMPEG_PATH')
 if ffmpeg_path is None and platform.system() in ['Linux', 'Darwin']:
     try:
@@ -90,335 +95,8 @@ if ffmpeg_path is not None and ffmpeg_path not in os.getenv('PATH'):
     print("Adding FFMPEG_PATH to PATH")
     os.environ["PATH"] = f"{ffmpeg_path}:{os.environ['PATH']}"
     
-
-weight_dtype = torch.float16
-
-device = "cuda"
-if not torch.cuda.is_available():
-    device = "cpu"
-
-inference_config_path = os.path.join(current_path,"configs","inference","inference_v2.yaml")
-infer_config = OmegaConf.load(inference_config_path)
-
-def select_face(det_bboxes, probs):
-    ## max face from faces that the prob is above 0.8
-    ## box: xyxy
-    if det_bboxes is None or probs is None:
-        return None
-    filtered_bboxes = []
-    for bbox_i in range(len(det_bboxes)):
-        if probs[bbox_i] > 0.8:
-            filtered_bboxes.append(det_bboxes[bbox_i])
-    if len(filtered_bboxes) == 0:
-        return None
-    sorted_bboxes = sorted(filtered_bboxes, key=lambda x: (x[3] - x[1]) * (x[2] - x[0]), reverse=True)
-    return sorted_bboxes[0]
-
-  
-def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
-                  facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,pipe,face_detector,save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer=None,crop_face=True,):
     
-    if seed is not None and seed > -1:
-        generator = torch.manual_seed(seed)
-    else:
-        generator = torch.manual_seed(random.randint(100, 1000000))
-    
-    #### face musk prepare
-    face_img=np.array(uploaded_img)
-    face_img=cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
-    face_mask = np.zeros((face_img.shape[0], face_img.shape[1])).astype('uint8')
-    det_bboxes, probs = face_detector.detect(face_img)
-    select_bbox = select_face(det_bboxes, probs)
-    if select_bbox is None:
-        face_mask[:, :] = 255
-    else:
-        xyxy = select_bbox[:4].astype(float)# 原方法的np版本 无法实现整形
-        xyxy = np.round(xyxy).astype("int")
-        rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
-        r_pad = int((re - rb) * facemask_dilation_ratio)
-        c_pad = int((ce - cb) * facemask_dilation_ratio)
-        face_mask[rb - r_pad: re + r_pad, cb - c_pad: ce + c_pad] = 255
-        
-        #### face crop
-        r_pad_crop = int((re - rb) * facecrop_dilation_ratio)
-        c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
-        crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop), min(ce + c_pad_crop, face_img.shape[1]),
-                     min(re + r_pad_crop, face_img.shape[0])]
-        face_img, ori_face_rect_a = crop_and_pad(face_img, crop_rect)
-        face_mask, ori_mask_rect_b = crop_and_pad(face_mask, crop_rect)  #ori_face_rect_a,ori_mask_rect_b no use
-        face_img = cv2.resize(face_img, (width, height))
-        face_mask = cv2.resize(face_mask, (width, height))
-    
-    ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
-    face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
-        0).unsqueeze(0) / 255.0
-    audio = None
-    if visualizer:
-        #add face crop
-        if crop_face:
-            face_img = np.array(uploaded_img)
-            face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
-            det_bboxes, probs = face_detector.detect(face_img)
-            select_bbox = select_face(det_bboxes, probs)
-            if select_bbox is not None:
-                xyxy = select_bbox[:4].astype(float)  # 原方法的np版本 无法实现整形
-                xyxy = np.round(xyxy).astype('int')
-                rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
-                r_pad_crop = int((re - rb) * facecrop_dilation_ratio)
-                c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
-                crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop),
-                             min(ce + c_pad_crop, face_img.shape[1]),
-                             min(re + c_pad_crop, face_img.shape[0])]
-                print(crop_rect)
-                face_img, ori_face_rect = crop_and_pad(face_img, crop_rect)
-                face_mask, ori_face_mask_rect = crop_and_pad(face_mask, crop_rect)
-                print(ori_face_rect)
-                ori_face_size = (ori_face_rect[2] - ori_face_rect[0], ori_face_rect[3] - ori_face_rect[1])
-                face_img = cv2.resize(face_img, (width, height))
-                face_mask = cv2.resize(face_mask, (width, height))
-            else:
-                face_mask[:, :] = 255
-        ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
-        
-        if pose_dir == "none":  # motion sync
-            if video_files != "none":
-                pose_dir, audio_from_v = motion_sync_main(visualizer, width, height, video_files, face_img,
-                                                          audio_form_video, audio_file_prefix)
-                if audio_form_video:
-                    uploaded_audio = audio_from_v
-                    waveform, sample_rate = torchaudio.load(uploaded_audio)
-                    audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
-            else:
-                pose_dir = os.path.join(current_path, "assets", "test_pose_demo_pose")  # default
-        else:
-            pose_dir = os.path.join(tensorrt_lite, pose_dir)
-        
-        
-        pose_list = []
-        for index in range(len(os.listdir(pose_dir))):
-            tgt_musk_path = os.path.join(pose_dir, f"{index}.pkl")
-            with open(tgt_musk_path, "rb") as f:
-                tgt_kpts = pickle.load(f)
-            tgt_musk = visualizer.draw_landmarks((width, height), tgt_kpts)
-            tgt_musk_pil = Image.fromarray(np.array(tgt_musk).astype(np.uint8)).convert('RGB')
-            pose_list.append(
-                torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
-        face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-        
-    video = pipe(
-        ref_image_pil,
-        uploaded_audio,
-        face_mask_tensor,
-        width,
-        height,
-        length,
-        steps,
-        cfg,
-        generator=generator,
-        audio_sample_rate=sample_rate,
-        context_frames=context_frames,
-        fps=fps,
-        context_overlap=context_overlap
-    ).videos
-    
-    final_length = min(video.shape[2], face_mask_tensor.shape[2], length)
-    
-    output_file = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_echo.mp4")
-    
-    ouput_list = save_videos_grid(video, output_file, n_rows=1, fps=fps, save_video=save_video)
-    
-    if save_video:
-        output_video_path=os.path.join(folder_paths.output_directory,f"{audio_file_prefix}_audio.mp4")
-        video_clip = VideoFileClip(output_file)
-        audio_clip = AudioFileClip(uploaded_audio)
-        final_clip = video_clip.set_audio(audio_clip)
-        final_clip.write_videofile(
-            output_video_path,
-            codec="libx264", audio_codec="aac")
-        print(f"saving {output_video_path}")
-        video_clip.reader.close()
-        audio_clip.close()
-        final_clip.reader.close()
-        
-    return ouput_list,audio
-
-def download_weights(file_dir,repo_id,subfolder="",pt_name=""):
-    if subfolder:
-        file_path = os.path.join(file_dir,subfolder, pt_name)
-        sub_dir=os.path.join(file_dir,subfolder)
-        if not os.path.exists(sub_dir):
-            os.makedirs(sub_dir)
-        if not os.path.exists(file_path):
-            pt_path = hf_hub_download(
-                repo_id=repo_id,
-                subfolder=subfolder,
-                filename=pt_name,
-                local_dir = file_dir,
-            )
-        else:
-            pt_path=get_instance_path(file_path)
-        return pt_path
-    else:
-        file_path = os.path.join(file_dir, pt_name)
-        if not os.path.exists(file_dir):
-            os.makedirs(file_dir)
-        if not os.path.exists(file_path):
-            pt_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=pt_name,
-                local_dir=file_dir,
-            )
-        else:
-            pt_path=get_instance_path(file_path)
-        return pt_path
-
-def tensor_to_pil(tensor):
-    image_np = tensor.squeeze().mul(255).clamp(0, 255).byte().numpy()
-    image = Image.fromarray(image_np, mode='RGB')
-    return image
-
-def pil2narry(img):
-    img = torch.from_numpy(np.array(img).astype(np.float32) / 255.0).unsqueeze(0)
-    return img
-
-def narry_list(list_in):
-    for i in range(len(list_in)):
-        value = list_in[i]
-        modified_value = pil2narry(value)
-        list_in[i] = modified_value
-    return list_in
-
-def get_video_img(tensor):
-    if tensor==None:
-        return None
-    outputs = []
-    for x in tensor:
-        x = tensor_to_pil(x)
-        outputs.append(x)
-    yield outputs
-
-
-def gen_img_form_video(tensor):
-    pil=[]
-    for x in tensor:
-       pil[x]=tensor_to_pil(x)
-    yield pil
-    
-def phi_list(list_in):
-    for i in range(len(list_in)):
-        value = list_in[i]
-        list_in[i] = value
-    return list_in
-
-
-def nomarl_upscale(img_tensor, width, height):
-    samples = img_tensor.movedim(-1, 1)
-    img = common_upscale(samples, width, height, "nearest-exact", "center")
-    samples = img.movedim(1, -1)
-    img_pil = tensor_to_pil(samples)
-    return img_pil
-
-def get_local_path(comfy_file_path, model_path):
-    path = os.path.join(comfy_file_path, "models", "diffusers", model_path)
-    model_path = os.path.normpath(path)
-    if sys.platform == 'win32':
-        model_path = model_path.replace('\\', "/")
-    return model_path
-
-def get_instance_path(path):
-    instance_path = os.path.normpath(path)
-    if sys.platform == 'win32':
-        instance_path = instance_path.replace('\\', "/")
-    return instance_path
-
-paths = []
-for search_path in folder_paths.get_folder_paths("diffusers"):
-    if os.path.exists(search_path):
-        for root, subdir, files in os.walk(search_path, followlinks=True):
-            if "model_index.json" in files:
-                paths.append(os.path.relpath(root, start=search_path))
-
-if paths:
-    paths = ["none"] + [x for x in paths if x]
-else:
-    paths = ["none", ]
-    
-def instance_path(path, repo):
-    if repo == "":
-        if path == "none":
-            repo = "none"
-        else:
-            model_path = get_local_path(comfy_file_path, path)
-            repo = get_instance_path(model_path)
-    return repo
-
-
-def motion_sync_main(vis,width, height,driver_video,face_img,audio_form_video,audio_file_prefix):
-
-    lmk_extractor = LMKExtractor()
-    ref_det = lmk_extractor(face_img)
-    audio_path = None
-    driver_video = os.path.join(folder_paths.input_directory, driver_video)
-    
-    if audio_form_video:
-        audio_path = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_audio.wav")
-        video_clip = VideoFileClip(driver_video)
-        audio_clip = video_clip.audio
-        audio_clip.write_audiofile(audio_path)
-        video_clip.close()
-        audio_clip.close()
-        
-    input_frames_cv2 = [i for i in pils_from_video(driver_video,width, height)] #原方法 先cv，中心剪裁转pil，再转cv再中心剪裁，然后再pil转CV很奇怪
-    
-    # print(ref_det)
-    sequence_driver_det = []
-    try:
-        for frame in input_frames_cv2:
-            result = lmk_extractor(frame)
-            assert result is not None, "{}, bad video, face not detected".format(driver_video)
-            sequence_driver_det.append(result)
-    except:
-        print("face detection failed")
-        
-    print("motion sync lenght " f"{len(sequence_driver_det)}")
-    
-    if vis:
-        pose_frames_driver = [vis.draw_landmarks((width, height), i["lmks"], normed=True) for i in sequence_driver_det]
-        poses_add_driver = [(i * 0.5 + j * 0.5).clip(0, 255).astype(np.uint8) for i, j in
-                            zip(input_frames_cv2, pose_frames_driver)]
-    
-    save_dir=os.path.join(tensorrt_lite,audio_file_prefix)
-    save_dir=os.path.normpath(save_dir)
-    
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-        sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
-        for i in range(len(sequence_det_ms)):
-            with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
-                pickle.dump(sequence_det_ms[i], file)
-        print(f"motion_sync {save_dir} is done")
-    else: #同名文件
-        files_ex=os.path.join(save_dir,"0.pkl")
-        files_ex=os.path.normpath(files_ex)
-        if not os.path.isfile(files_ex):#判断是否有模型文件
-            sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
-            for i in range(len(sequence_det_ms)):
-                with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
-                    pickle.dump(sequence_det_ms[i], file)
-            print(f"motion_sync {save_dir} is done")
-        else:
-            print("The model file already exists ")
-        
-    # if vis:
-    #     pose_frames = [vis.draw_landmarks((width, height), i, normed=False) for i in sequence_det_ms]
-    #     poses_add = [(i * 0.5 + ref_frame * 0.5).clip(0, 255).astype(np.uint8) for i in pose_frames]
-    #
-    # poses_cat = [np.concatenate([i, j], axis=1) for i, j in zip(poses_add_driver, poses_add)]
-    # output_video_path = os.path.join(folder_paths.output_directory, f"{image_name}_.mp4")
-    # if save_video:
-    #     save_video_from_cv2_list(poses_cat, output_video_path, fps=fps)
-    return  save_dir,audio_path
-
+#*****************mian***************
 
 class Echo_LoadModel:
     def __init__(self):
@@ -437,7 +115,7 @@ class Echo_LoadModel:
             }
         }
 
-    RETURN_TYPES = ("MODEL","MODEL","MODEL",)
+    RETURN_TYPES = ("MODEL_PIPE_E","MODEL_FACE_E","MODEL_VISUAL_E",)
     RETURN_NAMES = ("model","face_detector","visualizer",)
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
@@ -615,9 +293,9 @@ class Echo_LoadModel:
         pipe.enable_vae_slicing()
         if lowvram:
             pipe.enable_sequential_cpu_offload()
-        else:
-            pipe.to(device)
-        return (pipe,face_detector,visualizer,)
+            
+        model={"pipe":pipe,"lowvram":lowvram}
+        return (model,face_detector,visualizer,)
     
 
 class Echo_Sampler:
@@ -626,14 +304,17 @@ class Echo_Sampler:
         input_path = folder_paths.get_input_directory()
         video_files = [f for f in os.listdir(input_path) if
                        os.path.isfile(os.path.join(input_path, f)) and f.split('.')[-1] in ['webm', 'mp4', 'mkv', 'gif']]
+
+        pose_path_list = ["none"] + find_directories(tensorrt_lite) if find_directories(tensorrt_lite) else ["none", ]
+        
         return {
             "required": {
                 "image": ("IMAGE",),
                 "audio": ("AUDIO",),
-                "pipe": ("MODEL",),
-                "face_detector": ("MODEL",),
+                "model": ("MODEL_PIPE_E",),
+                "face_detector": ("MODEL_FACE_E",),
                 "video_files": (["none"] + video_files,),
-                "pose_dir":(pose_path_list_,),
+                "pose_dir":(pose_path_list,),
                 "seeds": ("INT", {"default": 0, "min": 0, "max":10000}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 10.0, "step": 0.1, "round": 0.01}),
                 "steps": ("INT", {"default": 30, "min": 1, "max": 100}),
@@ -650,7 +331,7 @@ class Echo_Sampler:
                 "audio_form_video": ("BOOLEAN", {"default": False},),
                 "save_video": ("BOOLEAN", {"default": False},), },
             "optional": {
-                "visualizer": ("MODEL",),}
+                "visualizer": ("MODEL_VISUAL_E",),}
         }
     
     RETURN_TYPES = ("IMAGE","AUDIO","FLOAT")
@@ -658,9 +339,13 @@ class Echo_Sampler:
     FUNCTION = "em_main"
     CATEGORY = "EchoMimic"
     
-    def em_main(self, image,audio,pipe,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
+    def em_main(self, image,audio,model,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
                     width, height,audio_form_video,save_video,**kwargs):
         #防止batch img输入引发的tensor缩放错误
+        pipe=model.get("pipe")
+        lowvram=model.get("lowvram")
+        if not lowvram:
+            pipe.to(device)
         d1, _, _, _ = image.size()
         if d1 == 1:
             image = nomarl_upscale(image, width, height)
@@ -668,8 +353,10 @@ class Echo_Sampler:
             img_list = list(torch.chunk(image, chunks=d1))
             image = [nomarl_upscale(img, width, height) for img in img_list][0]
         visualizer = kwargs.get("visualizer")
+        
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
-        audio_file = os.path.join(folder_paths.input_directory, f"audio_{audio_file_prefix}_temp.wav")
+        audio_file = os.path.join(folder_paths.get_input_directory(), f"audio_{audio_file_prefix}_temp.wav")
+        
         # 减少音频数据传递导致的不必要文件存储
         buff = io.BytesIO()
         torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
@@ -683,15 +370,209 @@ class Echo_Sampler:
         frame_rate=float(fps)
         if audio_form_video:
             audio=audio_form_v
+        if not lowvram: #for upsacle ,need  VR
+            pipe.to("cpu")
         torch.cuda.empty_cache()
         return (images,audio,frame_rate)
 
 
+class Echo_Upscaleloader:
+    def __init__(self):
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        ckpt_list_filter_U = [i for i in folder_paths.get_filename_list("Hallo") if i.endswith(".pth") and "lib" in i]
+        upscale_list = [i for i in folder_paths.get_filename_list("upscale_models") if "x2plus" in i.lower()]
+        return {
+            "required": {
+                "realesrgan": (["none"] + upscale_list,),
+                "face_detection_model": (["none"] + ckpt_list_filter_U,),
+                "bg_upsampler": (['realesrgan', 'none', ],),
+                "face_upsample": ("BOOLEAN", {"default": False},),
+                "has_aligned": ("BOOLEAN", {"default": False},),
+                "bg_tile": ("INT", {
+                    "default": 400,
+                    "min": 200,  # Minimum value
+                    "max": 1000,  # Maximum value
+                    "step": 10,  # Slider's step
+                    "display": "number",  # Cosmetic only: display as "number" or "slider"
+                }),
+                "upscale": ("INT", {
+                    "default": 2,
+                    "min": 2,  # Minimum value
+                    "max": 4,  # Maximum value
+                    "step": 2,  # Slider's step
+                    "display": "number",  # Cosmetic only: display as "number" or "slider"
+                }),
+            },
+        }
+    
+    RETURN_TYPES = ("ECHO_U_MODEL",)
+    RETURN_NAMES = ("model",)
+    FUNCTION = "Upscale_main"
+    CATEGORY = "EchoMimic"
+    
+    def Upscale_main(self, realesrgan, face_detection_model, bg_upsampler, face_upsample, has_aligned, bg_tile,
+                     upscale):
+        
+        if realesrgan == "none":
+            raise "need chocie a 2x upcsale model!"
+        model_path = folder_paths.get_full_path("upscale_models", realesrgan)
+        
+        parse_model = os.path.join(weigths_facelib_path, "parsing_parsenet.pth")
+        if not os.path.exists(parse_model):
+            print(f"no 'parsing_parsenet.pth' in {parse_model} ,try download from huggingface!")
+            hf_hub_download(
+                repo_id="fudan-generative-ai/hallo2",
+                subfolder="facelib",
+                filename="parsing_parsenet.pth",
+                local_dir=weigths_hallo_current_path,
+            )
+        
+        if face_detection_model == "none":
+            raise "need chocie a face_detection_model,resent or yolov5"
+        face_detection_model = folder_paths.get_full_path("Hallo", face_detection_model)
+        
+        hallo_model_path = os.path.join(weigths_hallo_current_path,"hallo2", "net_g.pth")
+        if not os.path.exists(hallo_model_path):
+            print(f"no net_g.pth in {weigths_hallo_current_path}/hallo2 ,try download from huggingface!")
+            hf_hub_download(
+                repo_id="fudan-generative-ai/hallo2",
+                subfolder="hallo2",
+                filename="net_g.pth",
+                local_dir=weigths_hallo_current_path,
+            )
+        
+        net, face_upsampler, bg_upsampler, face_helper = pre_u_loader(bg_upsampler, model_path, bg_tile, upscale,
+                                                                      face_upsample, device, hallo_model_path,
+                                                                      face_detection_model, parse_model, has_aligned)
+        model = {"net": net, "face_upsampler": face_upsampler, "bg_upsampler": bg_upsampler, "upscale": upscale,
+                 "face_helper": face_helper, "has_aligned": has_aligned, "face_upsample": face_upsample}
+        return (model,)
+
+
+class Echo_VideoUpscale:
+    def __init__(self):
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        input_path = folder_paths.get_input_directory()
+        video_files = [f for f in os.listdir(input_path) if
+                       os.path.isfile(os.path.join(input_path, f)) and f.split('.')[-1] in ['webm', 'mp4', 'mkv',
+                                                                                            'gif']]
+        return {
+            "required": {
+                "model": ("ECHO_U_MODEL",),
+                "video_path": (["none"] + video_files,),
+                "fidelity_weight": ("FLOAT", {
+                    "default": 0.5,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.1,
+                    "round": 0.01,
+                    "display": "number",
+                }),
+                "only_center_face": ("BOOLEAN", {"default": False},),
+                "draw_box": ("BOOLEAN", {"default": False},),
+                "save_video": ("BOOLEAN", {"default": False},),
+                
+            },
+            "optional": {"image": ("IMAGE",),
+                         "audio": ("AUDIO",),
+                         "frame_rate": ("FLOAT", {"forceInput": True, "default": 0.5, }),
+                         "path": ("STRING", {"forceInput": True, "default": "", }),
+                         },
+        }
+    
+    RETURN_TYPES = ("IMAGE", "AUDIO", "FLOAT",)
+    RETURN_NAMES = ("image", "audio", "frame_rate")
+    FUNCTION = "Upscale_main"
+    CATEGORY = "EchoMimic"
+    
+    def Upscale_main(self, model, video_path, fidelity_weight, only_center_face, draw_box, save_video, **kwargs):
+        # pre data
+        video_img = kwargs.get("image")
+        audio = kwargs.get("audio")
+        frame_rate = kwargs.get("frame_rate")
+        sampler_path = kwargs.get("path")
+        
+        # pre model
+        net_g = model.get("net")
+        face_upsampler = model.get("face_upsampler")
+        bg_upsampler = model.get("bg_upsampler")
+        upscale = model.get("upscale")
+        face_helper = model.get("face_helper")
+        has_aligned = model.get("has_aligned")
+        face_upsample = model.get("face_upsample")
+        
+        front_path = Path(sampler_path) if sampler_path and os.path.exists(Path(sampler_path)) else None
+        video_list = []
+        if isinstance(video_img, list):
+            if isinstance(video_img[0], torch.Tensor):
+                video_list = video_img
+        elif isinstance(video_img, torch.Tensor):
+            b, _, _, _ = video_img.size()
+            if b == 1:
+                img = [b]
+                while img is not []:
+                    video_list += img
+            else:
+                video_list = torch.chunk(video_img, chunks=b)
+        
+        print(len(video_list))
+        video_list = [tensor2cv(i) for i in video_list] if video_list else []  # tensor to np
+        
+        if video_path != "none":
+            if front_path is not None:
+                path = front_path
+            else:
+                path = os.path.join(folder_paths.get_input_directory(), video_path)
+        else:
+            if front_path is not None:
+                path = front_path
+            else:
+                path = None
+        
+        if video_list:  # prior choice
+            path = None
+        
+        if not video_list and video_path == "none" and not front_path:
+            raise "Need choice a video or link 'path or image' in the front!!!"
+        
+        output_path = folder_paths.get_output_directory()
+        
+        # infer
+        print("Start to video upscale processing...")
+        video_image, audio_form_v, fps = run_realesrgan(video_list, audio, frame_rate, fidelity_weight, path,
+                                                        output_path,
+                                                        has_aligned, only_center_face, draw_box, bg_upsampler,
+                                                        save_video, net_g, face_upsampler, upscale, face_helper,
+                                                        face_upsample, suffix="", )
+        if path is not None:
+            audio = audio_form_v
+        frame_rate = float(fps)
+        
+        img_list = []
+        if isinstance(video_image, list):
+            for i in video_image:
+                for j in i:
+                    img_list.append(j)
+        
+        image = load_images(img_list)
+        return (image, audio, frame_rate,)
+
+
 NODE_CLASS_MAPPINGS = {
     "Echo_LoadModel":Echo_LoadModel,
-    "Echo_Sampler": Echo_Sampler
+    "Echo_Sampler": Echo_Sampler,
+    "Echo_Upscaleloader":Echo_Upscaleloader,
+    "Echo_VideoUpscale":Echo_VideoUpscale
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "Echo_LoadModel":"Echo_LoadModel",
     "Echo_Sampler": "Echo_Sampler",
+    "Echo_Upscaleloader":"Echo_Upscaleloader",
+    "Echo_VideoUpscale": "Echo_VideoUpscale"
 }
