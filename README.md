@@ -6,6 +6,11 @@ You can using EchoMimic in comfyui
 ---
 
 ## Updates:
+**2024/11/01**    
+* Add upscale model and Resnet model auto download codes（if had ，they in comfyUI/models/upscale_models/RealESRGAN_x2plus.pth and comfyUI/models/Hallo/facelib/detection_Resnet50_Final.pth）， first use ，keep “realesrgan” and “face_detection_model” ‘none’ will auto download..  
+* 增加detection_Resnet50_Final.pth 和RealESRGAN_x2plus.pth自动下载的代码，首次使用，保持realesrgan和face_detection_model菜单为‘none’（无）时就会自动下载，如果菜单里已有模型，请选择模型。  
+
+
 **2024/10/26**    
 * 新增hallo2的2倍放大节点，输入视频的尺寸必须是512 * 512方形，输出为1024 * 1024
 
