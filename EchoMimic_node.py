@@ -1,6 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
 import io
+import logging
 import os
 import random
 import numpy as np
@@ -417,12 +418,22 @@ class Echo_Upscaleloader:
                      upscale):
         
         if realesrgan == "none":
-            raise "need chocie a 2x upcsale model!"
-        model_path = folder_paths.get_full_path("upscale_models", realesrgan)
+            if not "RealESRGAN_x2plus.pth" in folder_paths.get_filename_list("upscale_models"):
+                logging.info("NO RealESRGAN_x2plus.pth find in upscale_models dir,start auto download")
+                model_path=hf_hub_download(
+                    repo_id="fudan-generative-ai/hallo2",
+                    subfolder="realesrgan",
+                    filename="RealESRGAN_x2plus.pth",
+                    local_dir=os.path.join(folder_paths.models_dir,"upscale_models"),
+                )
+            else:
+                raise "Need choice 'RealESRGAN_x2plus.pth' at 'realesrgan' menu"
+        else:
+            model_path = folder_paths.get_full_path("upscale_models", realesrgan)
         
         parse_model = os.path.join(weigths_facelib_path, "parsing_parsenet.pth")
         if not os.path.exists(parse_model):
-            print(f"no 'parsing_parsenet.pth' in {parse_model} ,try download from huggingface!")
+            print(f" No 'parsing_parsenet.pth' in {parse_model} ,try download from huggingface!")
             hf_hub_download(
                 repo_id="fudan-generative-ai/hallo2",
                 subfolder="facelib",
@@ -431,8 +442,18 @@ class Echo_Upscaleloader:
             )
         
         if face_detection_model == "none":
-            raise "need chocie a face_detection_model,resent or yolov5"
-        face_detection_model = folder_paths.get_full_path("Hallo", face_detection_model)
+            if not "detection_Resnet50_Final.pth" in folder_paths.get_filename_list("Hallo"):
+                logging.info("NO detection_Resnet50_Final.pth find in Hallo dir,start auto download")
+                face_detection_model = hf_hub_download(
+                    repo_id="fudan-generative-ai/hallo2",
+                    subfolder="facelib",
+                    filename="detection_Resnet50_Final.pth",
+                    local_dir=weigths_hallo_current_path,
+                )
+            else:
+                raise "need chocie a face_detection_model,resent or yolov5"
+        else:
+            face_detection_model = folder_paths.get_full_path("Hallo", face_detection_model)
         
         hallo_model_path = os.path.join(weigths_hallo_current_path,"hallo2", "net_g.pth")
         if not os.path.exists(hallo_model_path):
