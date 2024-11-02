@@ -29,7 +29,8 @@ git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 
 ```
 pip install -r requirements.txt
-pip install --no-deps opencv-python 
+pip install --no-deps opencv-python
+pip install --no-deps facenet-pytorch
 ```
 Notice
 ---
