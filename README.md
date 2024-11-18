@@ -7,9 +7,9 @@ You can using EchoMimic in comfyui
 
 ## Updates:
 **2024/11/18**  
-* Fix the bug of facial cropping, fix the bug of non square character deformation, and change the video driver to only use other video loading nodes such as VH or use the generated pkl model driver; 
-* 修复面部裁切的bug，修复非正方形人物变形的bug，视频驱动改成只能用其他视频加载节点比如VH或者用已生成好的pkl模型驱动； 
-﻿* The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;  
+* Fix the bug of facial cropping, fix the bug of non square character deformation, and change the video driver to only use other video loading nodes such as VH or use the generated pkl model driver;   
+* 修复面部裁切的bug，修复非正方形人物变形的bug，视频驱动改成只能用其他视频加载节点比如VH或者用已生成好的pkl模型驱动；
+* ﻿The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;     
 * facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切
 
 **2024/11/01**    
