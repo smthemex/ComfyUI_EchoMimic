@@ -19,7 +19,7 @@ from .src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline 
 from .src.models.face_locator import FaceLocator
 from .src.utils.draw_utils import FaceMeshVisualizer
 from .src.utils.motion_utils import motion_sync
-from .utils import load_images,tensor2cv,find_directories,nomarl_upscale,download_weights,get_instance_path,process_video,narry_list,weight_dtype
+from .utils import load_images,tensor2cv,find_directories,nomarl_upscale,download_weights,get_instance_path,process_video,narry_list,weight_dtype,cf_tensor2cv
 from .hallo.video_sr import run_realesrgan,pre_u_loader
 from facenet_pytorch import MTCNN
 from pathlib import Path
@@ -294,7 +294,7 @@ class Echo_LoadModel:
         pipe.enable_vae_slicing()
         if lowvram:
             pipe.enable_sequential_cpu_offload()
-            
+
         model={"pipe":pipe,"lowvram":lowvram}
         return (model,face_detector,visualizer,)
     
@@ -302,37 +302,31 @@ class Echo_LoadModel:
 class Echo_Sampler:
     @classmethod
     def INPUT_TYPES(s):
-        input_path = folder_paths.get_input_directory()
-        video_files = [f for f in os.listdir(input_path) if
-                       os.path.isfile(os.path.join(input_path, f)) and f.split('.')[-1] in ['webm', 'mp4', 'mkv', 'gif']]
-
         pose_path_list = ["none"] + find_directories(tensorrt_lite) if find_directories(tensorrt_lite) else ["none", ]
-        
         return {
             "required": {
-                "image": ("IMAGE",),
+                "image": ("IMAGE",), # [B,H,W,C], C=3
                 "audio": ("AUDIO",),
                 "model": ("MODEL_PIPE_E",),
                 "face_detector": ("MODEL_FACE_E",),
-                "video_files": (["none"] + video_files,),
                 "pose_dir":(pose_path_list,),
                 "seeds": ("INT", {"default": 0, "min": 0, "max":10000}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 10.0, "step": 0.1, "round": 0.01}),
                 "steps": ("INT", {"default": 30, "min": 1, "max": 100}),
-                "fps": ("INT", {"default": 24, "min": 1, "max": 60}),
+                "fps": ("INT", {"default": 25, "min": 5, "max": 100}),
                 "sample_rate":  ("INT", {"default": 16000, "min": 8000, "max": 48000,"step": 1000,}),
                 "facemask_ratio": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
-                "facecrop_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
+                "facecrop_ratio": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "context_frames": ("INT", {"default": 12, "min": 0, "max": 50}),
                 "context_overlap": ("INT", {"default": 3, "min": 0, "max": 10}),
-                "crop_face" :("BOOLEAN", {"default": True},),
-                "length": ("INT", {"default": 120, "min": 100, "max": 5000, "step": 1, "display": "number"}),
+                "length": ("INT", {"default": 120, "min": 50, "max": 5000, "step": 1, "display": "number"}),
                 "width": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
                 "height": ("INT", {"default": 512, "min": 128, "max": 1024, "step": 64, "display": "number"}),
-                "audio_form_video": ("BOOLEAN", {"default": False},),
                 "save_video": ("BOOLEAN", {"default": False},), },
             "optional": {
-                "visualizer": ("MODEL_VISUAL_E",),}
+                "visualizer": ("MODEL_VISUAL_E",),
+                "video_images": ("IMAGE",), # [B,H,W,C], C=3,B>1
+            }
         }
     
     RETURN_TYPES = ("IMAGE","AUDIO","FLOAT")
@@ -340,20 +334,17 @@ class Echo_Sampler:
     FUNCTION = "em_main"
     CATEGORY = "EchoMimic"
     
-    def em_main(self, image,audio,model,face_detector,video_files,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,crop_face,length,
-                    width, height,audio_form_video,save_video,**kwargs):
-        #防止batch img输入引发的tensor缩放错误
+    def em_main(self, image,audio,model,face_detector,pose_dir,seeds,cfg, steps,fps,sample_rate,facemask_ratio,facecrop_ratio,context_frames,context_overlap,length,
+                    width, height,save_video,**kwargs):
+       
         pipe=model.get("pipe")
         lowvram=model.get("lowvram")
         if not lowvram:
-            pipe.to(device)
-        d1, _, _, _ = image.size()
-        if d1 == 1:
-            image = nomarl_upscale(image, width, height)
-        else:
-            img_list = list(torch.chunk(image, chunks=d1))
-            image = [nomarl_upscale(img, width, height) for img in img_list][0]
+            pipe.to(device,torch.float16)
+        
+        image=cf_tensor2cv(image,width, height) # cv
         visualizer = kwargs.get("visualizer")
+        video_images = kwargs.get("video_images")
         
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
         audio_file = os.path.join(folder_paths.get_input_directory(), f"audio_{audio_file_prefix}_temp.wav")
@@ -363,14 +354,13 @@ class Echo_Sampler:
         torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
         with open(audio_file, 'wb') as f:
             f.write(buff.getbuffer())
-        output_video,audio_form_v= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
+        output_video= process_video(image, audio_file, width, height, length, seeds, facemask_ratio,
                                      facecrop_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps,
-                                    pipe, face_detector, save_video,pose_dir,video_files,audio_form_video,audio_file_prefix,visualizer,crop_face,)
+                                    pipe, face_detector, save_video,pose_dir,video_images,audio_file_prefix,visualizer)
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
         frame_rate=float(fps)
-        if audio_form_video:
-            audio=audio_form_v
+
         if not lowvram: #for upsacle ,need  VR
             pipe.to("cpu")
         torch.cuda.empty_cache()
