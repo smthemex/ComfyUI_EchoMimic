@@ -6,10 +6,15 @@ You can using EchoMimic in comfyui
 ---
 
 ## Updates:
+**2024/11/18**  
+* Fix the bug of facial cropping, fix the bug of non square character deformation, and change the video driver to only use other video loading nodes such as VH or use the generated pkl model driver; 
+* 修复面部裁切的bug，修复非正方形人物变形的bug，视频驱动改成只能用其他视频加载节点比如VH或者用已生成好的pkl模型驱动； 
+﻿* The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;  
+* facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切
+
 **2024/11/01**    
 * Add upscale model and Resnet model auto download codes（if had ，they in comfyUI/models/upscale_models/RealESRGAN_x2plus.pth and comfyUI/models/Hallo/facelib/detection_Resnet50_Final.pth）， first use ，keep “realesrgan” and “face_detection_model” ‘none’ will auto download..  
 * 增加detection_Resnet50_Final.pth 和RealESRGAN_x2plus.pth自动下载的代码，首次使用，保持realesrgan和face_detection_model菜单为‘none’（无）时就会自动下载，如果菜单里已有模型，请选择模型。  
-
 
 **2024/10/26**    
 * 新增hallo2的2倍放大节点，输入视频的尺寸必须是512 * 512方形，输出为1024 * 1024
@@ -29,13 +34,12 @@ git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 
 ```
 pip install -r requirements.txt
-pip install --no-deps opencv-python
 pip install --no-deps facenet-pytorch
 ```
 Notice
 ---
-* 如果安装opencv-python后comfyUI奔溃，可以先卸载torch，然后再重新安装，以下版本只是示例：
-* if comfyUI  broken after pip  install  opencv-python ,try this below: 
+* 如果安装facenet-pytorch后comfyUI奔溃，可以先卸载torch，然后再重新安装，以下版本只是示例：
+* if comfyUI  broken after pip  install  facenet-pytorch ,try this below: 
 ```
 pip uninstall torchaudio torchvision torch xformers
 pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
@@ -138,12 +142,15 @@ Using Pose-Drived Algo Inference  ACC
 -----
 示例的VH node ComfyUI-VideoHelperSuite node: [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
-mormal Audio-Drived Algo Inference   new workflow  音频驱动视频常规示例  2倍放大 1024*1024  最新版本示例  
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/echonew.png)
+motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The new version 
+直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型  最新版    
+ ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/video2video.gif)
 
-motion_sync Extract facial features directly from the video (with the option of voice synchronization), while generating a PKL model for the reference video ，The old version 
-直接从从视频中提取面部特征(可以选择声音同步),同时生成参考视频的pkl模型    旧版    
- ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/motion_sync_using_audio_from_video.png)
+mormal Audio-Drived Algo Inference   The new version  workflow  音频驱动视频常规示例 最新  
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/audio2video.png)
+
+mormal Audio-Drived Algo Inference   The old version  workflow  音频驱动视频常规示例  2倍放大 1024*1024  旧版本示例  
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/echonew.png)
 
 pose from pkl，The old version, 基于预生成的pkl模型生成视频.  旧版      
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/new.png)
@@ -189,20 +196,12 @@ Special attention should be paid to:
 * 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
 * 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
 * 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
-* 解决可能是batch图片输入的错误。   
-* 加入audio acc 的模型支持，加入pose的face crop支持，0.24diffuser导入支持，其他版本的diffuser如果有导入出错，请issue留言。，清理了一些代码，待加入背景粘贴功能，     
-* 修复motion_sync不启用的bug，save_video现在默认关闭；   
-* 修复模型下载的路径定义错误，修复pkl文件路径存放的错误；     
-* 将audio输出改成comfyUI的统一格式（已经可以直连最新版的VH）  
-
+  
 **Previous updates：**   
 * After successfully installing the latest OpenCV Python library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch torch vision torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
 * Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
-* Add model support for audio acc, face crop support for pose, 0.24 diffuser import support. If there are import errors for other versions of diffusers, please leave an issue message, Cleared some code, waiting to add background paste function,   
-* Fixed the bug where motion_stync is not enabled, and save_video is now turned off by default;     
-* Fix the incorrect path definition for model download and the error in storing the pkl file path;     
-* Change the audio output to the unified format of ComfyUI (which can now be directly connected to the latest version of VH)      
 
+  
 ---
 
 6 Citation
