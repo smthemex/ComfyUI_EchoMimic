@@ -17,5 +17,5 @@ tqdm
 #moviepy==1.0.3
 #einops==0.4.1
 #omegaconf==2.3.0
-#opencv-python
+opencv-python
 #av==11.0.0
