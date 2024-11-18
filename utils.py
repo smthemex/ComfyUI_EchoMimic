@@ -1,5 +1,6 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
+import datetime
 import os
 import torch
 from PIL import Image
@@ -11,11 +12,10 @@ import torchaudio
 from huggingface_hub import hf_hub_download
 from moviepy.editor import VideoFileClip, AudioFileClip
 import random
-import logging
 from .src.utils.mp_utils  import LMKExtractor
-from .src.utils.img_utils import pil_to_cv2, cv2_to_pil, center_crop_cv2, pils_from_video, save_videos_from_pils, save_video_from_cv2_list
+from .src.utils.img_utils import pils_from_video
 from .src.utils.motion_utils import motion_sync
-from .src.utils.util import save_videos_grid, crop_and_pad
+from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
 
@@ -24,96 +24,97 @@ cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
 
-def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
+def process_video(face_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
                   facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
-                  face_detector, save_video, pose_dir, video_files, audio_form_video, audio_file_prefix,
-                  visualizer=None, crop_face=True, ):
+                  face_detector, save_video, pose_dir, video_images, audio_file_prefix,
+                  visualizer=None,):
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
     else:
         generator = torch.manual_seed(random.randint(100, 1000000))
     
     #### face musk prepare
-    face_img = np.array(uploaded_img)
-    face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
     face_mask = np.zeros((face_img.shape[0], face_img.shape[1])).astype('uint8')
     det_bboxes, probs = face_detector.detect(face_img)
     select_bbox = select_face(det_bboxes, probs)
+    
     if select_bbox is None:
         face_mask[:, :] = 255
     else:
-        xyxy = select_bbox[:4].astype(float)  # 原方法的np版本 无法实现整形
+        xyxy = select_bbox[:4].astype(float)  # 面部处理出来是浮点数，无法实现整形
         xyxy = np.round(xyxy).astype("int")
-        rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
-        r_pad = int((re - rb) * facemask_dilation_ratio)
-        c_pad = int((ce - cb) * facemask_dilation_ratio)
+        
+        rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2] #56 227 132 268
+        r_pad = int((re - rb) * facemask_dilation_ratio) # ratio：0.1 遮罩膨胀系数 17*2
+        c_pad = int((ce - cb) * facemask_dilation_ratio) # ratio：0.1 遮罩膨胀系数 14*2
         face_mask[rb - r_pad: re + r_pad, cb - c_pad: ce + c_pad] = 255
+       
+        #### face crop ####
+        if facecrop_dilation_ratio<1.0:
+            if facecrop_dilation_ratio==0:
+                facecrop_dilation_ratio=1
+            r_pad_crop = int((re - rb) * facecrop_dilation_ratio)  # ratio 0.5  r_pad_crop：85,c_pad_crop:68
+            c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)  # ratio 1.0  r_pad_crop：171,c_pad_crop:136
+            
+            crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop), min(ce + c_pad_crop, face_img.shape[1]),
+                         min(re + r_pad_crop, face_img.shape[0])]
+            
+            if width == height:
+                # 输出图片指定尺寸，如果是非方形，则会变形
+                face_img_i, ori_face_rect_i = crop_and_pad(face_img, crop_rect)
+                face_mask_m, ori_mask_rect_m = crop_and_pad(face_mask, crop_rect)  # (0, 7, 384, 391)
+                face_img = cv2.resize(face_img_i, (width, height))
+                face_mask = cv2.resize(face_mask_m, (width, height))
+            else:
+                face_img,face_mask=crop_and_pad_rectangle(face_img,face_mask,crop_rect)
+                face_img= cv2tensor(face_img).permute(0, 2, 3, 1)#[1, 3, 357, 245] =>[[1,357, 245,3]]
+                face_mask = cv2tensor(face_mask).permute(0, 2, 3, 1)
+                face_img=tensor_upscale(face_img, width, height)
+                face_img=tensor2cv(face_img)
+                face_mask = tensor_upscale(face_mask, width, height)
+                face_mask=cv2.cvtColor(tensor2cv(face_mask), cv2.COLOR_BGR2GRAY)#二值化
+                ret, face_mask = cv2.threshold(face_mask, 0, 255, cv2.THRESH_BINARY)
+                
+        else: #when ratio=1 no crop
+            print("when facecrop_ratio=1.0,The maximum image size will be obtained, but there may be edge deformation.** 选择最大裁切为1.0时，边缘可能会出现形变！")
         
-        #### face crop
-        r_pad_crop = int((re - rb) * facecrop_dilation_ratio)
-        c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
-        crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop), min(ce + c_pad_crop, face_img.shape[1]),
-                     min(re + r_pad_crop, face_img.shape[0])]
-        face_img, ori_face_rect_a = crop_and_pad(face_img, crop_rect)
-        face_mask, ori_mask_rect_b = crop_and_pad(face_mask, crop_rect)  # ori_face_rect_a,ori_mask_rect_b no use
-        face_img = cv2.resize(face_img, (width, height))
-        face_mask = cv2.resize(face_mask, (width, height))
-    
     ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
-    face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
-        0).unsqueeze(0) / 255.0
-    audio = None
+    
+    
     if visualizer:
-        # add face crop
-        if crop_face:
-            face_img = np.array(uploaded_img)
-            face_img = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
-            det_bboxes, probs = face_detector.detect(face_img)
-            select_bbox = select_face(det_bboxes, probs)
-            if select_bbox is not None:
-                xyxy = select_bbox[:4].astype(float)  # 原方法的np版本 无法实现整形
-                xyxy = np.round(xyxy).astype('int')
-                rb, re, cb, ce = xyxy[1], xyxy[3], xyxy[0], xyxy[2]
-                r_pad_crop = int((re - rb) * facecrop_dilation_ratio)
-                c_pad_crop = int((ce - cb) * facecrop_dilation_ratio)
-                crop_rect = [max(0, cb - c_pad_crop), max(0, rb - r_pad_crop),
-                             min(ce + c_pad_crop, face_img.shape[1]),
-                             min(re + c_pad_crop, face_img.shape[0])]
-                print(crop_rect)
-                face_img, ori_face_rect = crop_and_pad(face_img, crop_rect)
-                face_mask, ori_face_mask_rect = crop_and_pad(face_mask, crop_rect)
-                print(ori_face_rect)
-                ori_face_size = (ori_face_rect[2] - ori_face_rect[0], ori_face_rect[3] - ori_face_rect[1])
-                face_img = cv2.resize(face_img, (width, height))
-                face_mask = cv2.resize(face_mask, (width, height))
-            else:
-                face_mask[:, :] = 255
-        ref_image_pil = Image.fromarray(face_img[:, :, [2, 1, 0]])
-        
         if pose_dir == "none":  # motion sync
-            if video_files != "none":
-                pose_dir, audio_from_v = motion_sync_main(visualizer, width, height, video_files, face_img,
-                                                          audio_form_video, audio_file_prefix)
-                if audio_form_video:
-                    uploaded_audio = audio_from_v
-                    waveform, sample_rate = torchaudio.load(uploaded_audio)
-                    audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
+            if isinstance(video_images,torch.Tensor):
+                print("**** Use  video pose drive video! ****")
+                pose_dir_path,video_len = motion_sync_main(visualizer, width, height, video_images, face_img,facecrop_dilation_ratio,
+                                                          audio_file_prefix)
             else:
-                pose_dir = os.path.join(cur_path, "assets", "test_pose_demo_pose")  # default
+                raise ("**** You need link video_images for drive video  ****")
+                #pose_dir = os.path.join(cur_path, "assets", "test_pose_demo_pose")  # default
         else:
-            pose_dir = os.path.join(tensorrt_lite, pose_dir)
-        
+            print("**** Use  pkl drive video! ****")
+            pose_dir_path = os.path.join(tensorrt_lite, pose_dir)
+            files_and_directories = os.listdir(pose_dir_path)
+            # 过滤出文件，排除子目录
+            files = [f for f in files_and_directories if os.path.isfile(os.path.join(pose_dir_path, f))]
+            video_len=len(files)
+        if length>video_len:
+            print(f"**** video length {video_len} is less than length,use {video_len} as {length}  ****")
+            length=video_len
         pose_list = []
-        for index in range(len(os.listdir(pose_dir))):
-            tgt_musk_path = os.path.join(pose_dir, f"{index}.pkl")
+        for index in range(len(os.listdir(pose_dir_path))):
+            tgt_musk_path = os.path.join(pose_dir_path, f"{index}.pkl")
             with open(tgt_musk_path, "rb") as f:
                 tgt_kpts = pickle.load(f)
-            tgt_musk = visualizer.draw_landmarks((width, height), tgt_kpts)
+            tgt_musk = visualizer.draw_landmarks((width, height), tgt_kpts,facecrop_dilation_ratio)
             tgt_musk_pil = Image.fromarray(np.array(tgt_musk).astype(np.uint8)).convert('RGB')
             pose_list.append(
                 torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device="cuda").permute(2, 0, 1) / 255.0)
         face_mask_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-    
+    else:
+        print("**** Use  audio drive video! ****")
+        face_mask_tensor = torch.Tensor(face_mask).to(dtype=weight_dtype, device="cuda").unsqueeze(0).unsqueeze(
+            0).unsqueeze(0) / 255.0
+        
     video = pipe(
         ref_image_pil,
         uploaded_audio,
@@ -131,8 +132,8 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
     ).videos
     
     final_length = min(video.shape[2], face_mask_tensor.shape[2], length)
-    
     output_file = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_echo.mp4")
+    print(f"**** final_length is : {final_length} ****")
     
     ouput_list = save_videos_grid(video, output_file, n_rows=1, fps=fps, save_video=save_video)
     
@@ -144,49 +145,58 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         final_clip.write_videofile(
             output_video_path,
             codec="libx264", audio_codec="aac")
-        print(f"saving {output_video_path}")
+        print(f"**** saving{output_file} at {output_video_path} ****")
         video_clip.reader.close()
         audio_clip.close()
         final_clip.reader.close()
     
-    return ouput_list, audio
+    return ouput_list
 
-def motion_sync_main(vis, width, height, driver_video, face_img, audio_form_video, audio_file_prefix):
+def motion_sync_main(vis, width, height, video_images, face_img,facecrop_dilation_ratio, audio_file_prefix):
     lmk_extractor = LMKExtractor()
     ref_det = lmk_extractor(face_img)
-    audio_path = None
-    driver_video = os.path.join(folder_paths.input_directory, driver_video)
     
-    if audio_form_video:
-        audio_path = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_audio.wav")
-        video_clip = VideoFileClip(driver_video)
-        audio_clip = video_clip.audio
-        audio_clip.write_audiofile(audio_path)
-        video_clip.close()
-        audio_clip.close()
+    #driver_video = os.path.join(folder_paths.input_directory, driver_video)
+    # if audio_form_video:
+    #     audio_path = os.path.join(folder_paths.input_directory, f"{audio_file_prefix}_audio.wav")
+    #     video_clip = VideoFileClip(driver_video)
+    #     audio_clip = video_clip.audio
+    #     audio_clip.write_audiofile(audio_path)
+    #     video_clip.close()
+    #     audio_clip.close()
     
-    input_frames_cv2 = [i for i in
-                        pils_from_video(driver_video, width, height)]  # 原方法 先cv，中心剪裁转pil，再转cv再中心剪裁，然后再pil转CV很奇怪
-    
+    video_len,_,_,_=video_images.size()
+    if video_len<25:
+        raise "input video has not much frames for driver,change your input video!"
+    else:
+        tensor_list = list(torch.chunk(video_images, chunks=video_len))
+        input_frames_cv2=[tensor2cv(tensor_upscale(i, width, height)) for i in tensor_list]
+        
     # print(ref_det)
     sequence_driver_det = []
-    try:
-        for frame in input_frames_cv2:
-            result = lmk_extractor(frame)
-            assert result is not None, "{}, bad video, face not detected".format(driver_video)
-            sequence_driver_det.append(result)
-    except:
-        print("face detection failed")
+    if input_frames_cv2:
+        try:
+            print("**** Starting process video ****")
+            for frame in input_frames_cv2:
+                result = lmk_extractor(frame)
+                assert result is not None, "bad video, face not detected"
+                sequence_driver_det.append(result)
+        except:
+            print("face detection failed")
+    else:
+        raise "input video error,change your input video!"
     
-    print("motion sync lenght " f"{len(sequence_driver_det)}")
-    
+    print("**** motion sync lenght " f"{len(sequence_driver_det)} ****")
+  
     if vis:
-        pose_frames_driver = [vis.draw_landmarks((width, height), i["lmks"], normed=True) for i in sequence_driver_det]
+        if facecrop_dilation_ratio==0:
+            facecrop_dilation_ratio=1
+        pose_frames_driver = [vis.draw_landmarks((width, height), i["lmks"],facecrop_dilation_ratio, normed=True) for i in sequence_driver_det]
         poses_add_driver = [(i * 0.5 + j * 0.5).clip(0, 255).astype(np.uint8) for i, j in
                             zip(input_frames_cv2, pose_frames_driver)]
-    
+        #print(f"**** poses_add_driver is done in len : {len(poses_add_driver)} ****")
+        
     save_dir = os.path.join(tensorrt_lite, audio_file_prefix)
-    save_dir = os.path.normpath(save_dir)
     
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -194,28 +204,17 @@ def motion_sync_main(vis, width, height, driver_video, face_img, audio_form_vide
         for i in range(len(sequence_det_ms)):
             with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
                 pickle.dump(sequence_det_ms[i], file)
-        print(f"motion_sync {save_dir} is done")
-    else:  # 同名文件
-        files_ex = os.path.join(save_dir, "0.pkl")
-        files_ex = os.path.normpath(files_ex)
-        if not os.path.isfile(files_ex):  # 判断是否有模型文件
-            sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
-            for i in range(len(sequence_det_ms)):
-                with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
-                    pickle.dump(sequence_det_ms[i], file)
-            print(f"motion_sync {save_dir} is done")
-        else:
-            print("The model file already exists ")
-    
-    # if vis:
-    #     pose_frames = [vis.draw_landmarks((width, height), i, normed=False) for i in sequence_det_ms]
-    #     poses_add = [(i * 0.5 + ref_frame * 0.5).clip(0, 255).astype(np.uint8) for i in pose_frames]
-    #
-    # poses_cat = [np.concatenate([i, j], axis=1) for i, j in zip(poses_add_driver, poses_add)]
-    # output_video_path = os.path.join(folder_paths.output_directory, f"{image_name}_.mp4")
-    # if save_video:
-    #     save_video_from_cv2_list(poses_cat, output_video_path, fps=fps)
-    return save_dir, audio_path
+        print(f"**** motion_sync {save_dir} is done ****")
+    else:  #即便有文件夹，还是重新生成，避免出错
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        save_dir=os.path.join(tensorrt_lite,f"{audio_file_prefix}_{timestamp}")
+        os.makedirs(save_dir)
+        sequence_det_ms = motion_sync(sequence_driver_det, ref_det)
+        for i in range(len(sequence_det_ms)):
+            with open('{}/{}.pkl'.format(save_dir, i), 'wb') as file:
+                pickle.dump(sequence_det_ms[i], file)
+        print(f"**** motion_sync {save_dir} is done ****")
+    return save_dir,video_len
 
 
 def select_face(det_bboxes, probs):
@@ -328,6 +327,12 @@ def nomarl_upscale(img_tensor, width, height):
     img_pil = tensor_to_pil(samples)
     return img_pil
 
+def tensor_upscale(img_tensor, width, height):
+    samples = img_tensor.movedim(-1, 1)
+    img = common_upscale(samples, width, height, "nearest-exact", "center")
+    samples = img.movedim(1, -1)
+    return samples
+
 def get_local_path(comfy_file_path, model_path):
     path = os.path.join(comfy_file_path, "models", "diffusers", model_path)
     model_path = os.path.normpath(path)
@@ -343,10 +348,10 @@ def get_instance_path(path):
 
 
 def tensor2cv(tensor_image):
-    if len(tensor_image.shape)==4:#bhwc to hwc
+    if len(tensor_image.shape)==4:# b hwc to hwc
         tensor_image=tensor_image.squeeze(0)
     if tensor_image.is_cuda:
-        tensor_image = tensor_image.cpu().detach()
+        tensor_image = tensor_image.cpu()
     tensor_image=tensor_image.numpy()
     #反归一化
     maxValue=tensor_image.max()
@@ -429,4 +434,42 @@ def tensor2pil(tensor):
     image_np = tensor.squeeze().mul(255).clamp(0, 255).byte().numpy()
     image = Image.fromarray(image_np, mode='RGB')
     return image
+
+
+def cf_tensor2cv(tensor,width, height):
+    d1, _, _, _ = tensor.size()
+    if d1 > 1:
+        tensor_list = list(torch.chunk(tensor, chunks=d1))
+        tensor = [tensor_list][0]
+    cr_tensor=tensor_upscale(tensor,width, height)
+    cv_img=tensor2cv(cr_tensor)
+    return cv_img
+
+
+def process_image_pad(image,image_size):
+    w, h= image_size
+    min_side=min(w,h) #384 512
+    # 长边缩放为min_side
+    scale = max(w, h) /min_side
+    new_w, new_h = int(w / scale), int(h / scale)
+    resize_img = cv2.resize(image, (new_w, new_h))
+    # 填充至min_side * min_side
+    if new_w % 2 != 0 and new_h % 2 == 0:
+        top, bottom, left, right = (min_side - new_h) / 2, (min_side - new_h) / 2, (min_side - new_w) / 2 + 1, (
+                min_side - new_w) / 2
+    elif new_h % 2 != 0 and new_w % 2 == 0:
+        top, bottom, left, right = (min_side - new_h) / 2 + 1, (min_side - new_h) / 2, (min_side - new_w) / 2, (
+                min_side - new_w) / 2
+    elif new_h % 2 == 0 and new_w % 2 == 0:
+        top, bottom, left, right = (min_side - new_h) / 2, (min_side - new_h) / 2, (min_side - new_w) / 2, (
+                min_side - new_w) / 2
+    else:
+        top, bottom, left, right = (min_side - new_h) / 2 + 1, (min_side - new_h) / 2, (
+                    min_side - new_w) / 2 + 1, (
+                                           min_side - new_w) / 2
+    pad_img = cv2.copyMakeBorder(resize_img, top, bottom, left, right, cv2.BORDER_CONSTANT,
+                                 value=[0, 0, 0])  # 从图像边界向上,下,左,右扩的像素数目
+
+    return pad_img
+
 
