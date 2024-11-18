@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from mediapipe.framework.formats import landmark_pb2
-
+from .util import center_crop,crop_and_pad_rectangle_image
 class FaceMeshVisualizer:
     def __init__(self, 
             forehead_edge=False, 
@@ -156,8 +156,11 @@ class FaceMeshVisualizer:
             image[image_y - halfwidth : image_y + halfwidth, image_x - halfwidth : image_x + halfwidth, :] = draw_color
         
 
-    def draw_landmarks(self, image_size, keypoints, normed=False):
+    def draw_landmarks(self, image_size, keypoints,facecrop_dilation_ratio,normed=False):
         ini_size = [512, 512]
+        ori_img_size=image_size
+        if image_size[0] != image_size[1]:
+            image_size=(512,512)
         image = np.zeros([ini_size[1], ini_size[0], 3], dtype=np.uint8)
         if keypoints is not None:
             new_landmarks = landmark_pb2.NormalizedLandmarkList()
@@ -170,7 +173,7 @@ class FaceMeshVisualizer:
                     landmark.x = keypoints[i, 0] / image_size[0]
                     landmark.y = keypoints[i, 1] / image_size[1]
                 landmark.z = 1.0
-
+            
             self.mp_drawing.draw_landmarks(
                 image=image,
                 landmark_list=new_landmarks,
@@ -178,14 +181,26 @@ class FaceMeshVisualizer:
                 landmark_drawing_spec=None,
                 connection_drawing_spec=self.face_connection_spec
             )
-
+            
             if self.draw_pupil:
                 self.draw_points(image, new_landmarks, self.pupil_landmark_spec, 3)
             
             if self.draw_nose:
                 self.draw_points(image, new_landmarks, self.nose_landmark_spec, 3)
-
-        image = cv2.resize(image, (image_size[0], image_size[1]))
         
+        if ori_img_size[0] != ori_img_size[1]:  # 先默认为方形输入，然后居中裁切输入的512*512图片
+            max_ = max(ori_img_size[0], ori_img_size[1])
+            scale = 512 / max_
+            new_h = int(ori_img_size[1] * scale)
+            new_w = int(ori_img_size[0] * scale)
+            image=center_crop(image, new_w, new_h)
+        image = cv2.resize(image, (ori_img_size[0], ori_img_size[1])) #缩放为输入图幅
+        if facecrop_dilation_ratio==0:
+             facecrop_dilation_ratio=1
+        if facecrop_dilation_ratio < 1:
+            ratio=1/facecrop_dilation_ratio
+            image=cv2.resize(image, (int(ori_img_size[0] * ratio), int(ori_img_size[1] * ratio)), interpolation=cv2.INTER_LINEAR) #按系数放大
+            image = center_crop(image, ori_img_size[0], ori_img_size[1]) #再按输入图幅中心裁切
         return image
-
+    
+    
