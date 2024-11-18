@@ -6,12 +6,13 @@ import sys
 from pathlib import Path
 
 import av
+import cv2
 import numpy as np
 import torch
 import torchvision
 from einops import rearrange
 from PIL import Image
-
+from comfy.utils import common_upscale
 
 def seed_everything(seed):
     import random
@@ -167,3 +168,66 @@ def crop_and_pad(image, rect):
     cropped_image = image[new_y0:new_y1, new_x0:new_x1]
 
     return cropped_image, (new_x0, new_y0, new_x1, new_y1)
+
+def crop_and_pad_rectangle(image,mask, rect,):
+    x0, y0, x1, y1 = rect #[89, 6, 334, 363]
+    h, w = image.shape[:2] #512，384
+
+    # 确保坐标在图像范围内
+    x0, y0 = max(0, x0), max(0, y0)
+    x1, y1 = min(w, x1), min(h, y1)
+
+    # 裁剪图像
+    cropped_image = image[y0:y1, x0:x1]
+    cropped_mask = mask[y0:y1, x0:x1]
+   
+    return cropped_image, cropped_mask
+
+
+def crop_and_pad_rectangle_image(image, rect ):
+    x0, y0, x1, y1 = rect  # [89, 6, 334, 363]
+    h, w = image.shape[:2]  # 512，384
+    
+    # 确保坐标在图像范围内
+    x0, y0 = max(0, x0), max(0, y0)
+    x1, y1 = min(w, x1), min(h, y1)
+    
+    # 裁剪图像
+    cropped_image = image[y0:y1, x0:x1]
+    
+    return cropped_image
+
+def tensor2cv(tensor_image):
+    if len(tensor_image.shape)==4:#bhwc to hwc
+        tensor_image=tensor_image.squeeze(0)
+    if tensor_image.is_cuda:
+        tensor_image = tensor_image.cpu().detach()
+    tensor_image=tensor_image.numpy()
+    #反归一化
+    maxValue=tensor_image.max()
+    tensor_image=tensor_image*255/maxValue
+    img_cv2=np.uint8(tensor_image)#32 to uint8
+    img_cv2=cv2.cvtColor(img_cv2,cv2.COLOR_RGB2BGR)
+    return img_cv2
+
+def cv2tensor(img):
+    assert type(img) == np.ndarray, 'the img type is {}, but ndarry expected'.format(type(img))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = torch.from_numpy(img.transpose((2, 0, 1)))
+    return img.float().div(255).unsqueeze(0)  # 255也可以改为256
+
+def tensor_upscale(img_tensor, width, height):
+    samples = img_tensor.movedim(-1, 1)
+    img = common_upscale(samples, width, height, "nearest-exact", "center")
+    samples = img.movedim(1, -1)
+    return samples
+
+def center_crop(image, crop_width, crop_height):
+    # 获取图像的中心坐标
+    height, width = image.shape[:2]
+    x = width // 2 - crop_width // 2
+    y = height // 2 - crop_height // 2
+    
+    # 裁剪图像
+    crop_img = image[y:y + crop_height, x:x + crop_width]
+    return crop_img
