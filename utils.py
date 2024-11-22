@@ -16,7 +16,7 @@ import random
 from .src.utils.mp_utils  import LMKExtractor
 from .src.utils.img_utils import pils_from_video
 from .src.utils.motion_utils import motion_sync
-from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle
+from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle,center_crop
 from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
@@ -30,6 +30,13 @@ tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
 def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                    context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
                   save_video, pose_dir, audio_file_prefix,):
+    origin_h = height
+    origin_w = width
+    if width!=height:
+        max_l=max(width,height)
+        width=max_l
+        height = max_l
+    ref_image_pil = nomarl_upscale(ref_image_pil, width, height)
     
     if pose_dir=="none":
         logging.warning("when use echo v2,need choice a pose dir,for get error using default pose !")
@@ -40,52 +47,29 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     else:
         generator = torch.manual_seed(random.randint(100, 1000000))
     
-    final_fps = fps
-    
-    # ref_images_dir = f'assets/halfbody_demo/refimag'
-    # audio_dir = 'assets/halfbody_demo/audio'
-    # pose_dir = 'assets/halfbody_demo/pose'
-    #
-    # refimg_name = 'natural_bk_openhand/0035.png'
-    # audio_name = 'chinese/echomimicv2_woman.wav'
-    #pose_name = '01'
-    
-    # inputs_dict = {
-    #     "refimg": f'{ref_images_dir}/{refimg_name}',
-    #     "audio": f'{audio_dir}/{audio_name}',
-    #     "pose": f'{pose_dir}/{pose_name}',
-    # }
-    
+    #final_fps = fps
     start_idx = 0
-    
-    # print('Pose:', inputs_dict['pose'])
-    # print('Reference:', inputs_dict['refimg'])
-    # print('Audio:', inputs_dict['audio'])
-    
-    # ref_flag = '.'.join([refimg_name.split('/')[-2], refimg_name.split('/')[-1]])
-    #
-    # save_path = Path(f"{save_dir}/{ref_flag}/{pose_name}")
-    #
-    # save_path.mkdir(exist_ok=True, parents=True)
-    # ref_s = refimg_name.split('/')[-1].split('.')[0]
-    # save_name = f"{save_path}/{ref_s}-a-{audio_name}-i{start_idx}"
-    
     audio_clip = AudioFileClip(uploaded_audio)
     
-    L = min(int(audio_clip.duration * final_fps),len(os.listdir(pose_dir))) # if above will cause error
-    print(L)
+    L = min(int(audio_clip.duration * fps),length,len(os.listdir(pose_dir))) # if above will cause error
+    #L=min(length,L) #length is definitely
+    print(f"***** infer length is {L}")
     
     pose_list = []
     for index in range(start_idx, start_idx + L):
-        tgt_musk = np.zeros((width, height, 3)).astype('uint8')
+        #tgt_musk = np.zeros((width, height, 3)).astype('uint8')
         tgt_musk_path = os.path.join(pose_dir, "{}.npy".format(index))
         detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
         imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']
+        #print(imh_new, imw_new, rb, re, cb, ce)
         im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)
         im = np.transpose(np.array(im), (1, 2, 0))
+        new_H,new_W=im.shape[:2]
+        tgt_musk = np.zeros((new_W, new_H, 3)).astype('uint8')
         tgt_musk[rb:re, cb:ce, :] = im
-        
+        tgt_musk = center_resize(tgt_musk, width, height)
         tgt_musk_pil = Image.fromarray(np.array(tgt_musk)).convert('RGB')
+        
         pose_list.append(
             torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device=device).permute(2, 0, 1) / 255.0)
     
@@ -93,7 +77,7 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     print(f"poses_tensor:{poses_tensor.shape}")
     # audio_clip = AudioFileClip(audio_clip)
     #
-    # audio_clip = audio_clip.set_duration(L / final_fps)
+    # audio_clip = audio_clip.set_duration(L / fps)
  
     video = pipe(
         ref_image_pil,
@@ -107,17 +91,20 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         generator=generator,
         audio_sample_rate=sample_rate,
         context_frames=context_frames,
-        fps=final_fps,
+        fps=fps,
         context_overlap=context_overlap,
         start_idx=start_idx,
     ).videos
     
-    final_length = min(video.shape[2], L)
+    final_length = min(video.shape[2],poses_tensor.shape[2], L)
     video_sig = video[:, :, :final_length, :, :]
     output_file = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_echo.mp4")
     print(f"**** final_length is : {final_length} ****")
     
-    ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video)
+    if origin_h!=origin_w:
+        ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video,size=(origin_w,origin_h))
+    else:
+        ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video)
 
     if save_video:
         output_video_path = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_audio.mp4")
@@ -132,8 +119,6 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         audio_clip.close()
         final_clip.reader.close()
     return ouput_list
-
-
 
 
 
@@ -558,31 +543,17 @@ def cf_tensor2cv(tensor,width, height):
     cv_img=tensor2cv(cr_tensor)
     return cv_img
 
-
-def process_image_pad(image,image_size):
-    w, h= image_size
-    min_side=min(w,h) #384 512
-    # 长边缩放为min_side
-    scale = max(w, h) /min_side
-    new_w, new_h = int(w / scale), int(h / scale)
-    resize_img = cv2.resize(image, (new_w, new_h))
-    # 填充至min_side * min_side
-    if new_w % 2 != 0 and new_h % 2 == 0:
-        top, bottom, left, right = (min_side - new_h) / 2, (min_side - new_h) / 2, (min_side - new_w) / 2 + 1, (
-                min_side - new_w) / 2
-    elif new_h % 2 != 0 and new_w % 2 == 0:
-        top, bottom, left, right = (min_side - new_h) / 2 + 1, (min_side - new_h) / 2, (min_side - new_w) / 2, (
-                min_side - new_w) / 2
-    elif new_h % 2 == 0 and new_w % 2 == 0:
-        top, bottom, left, right = (min_side - new_h) / 2, (min_side - new_h) / 2, (min_side - new_w) / 2, (
-                min_side - new_w) / 2
-    else:
-        top, bottom, left, right = (min_side - new_h) / 2 + 1, (min_side - new_h) / 2, (
-                    min_side - new_w) / 2 + 1, (
-                                           min_side - new_w) / 2
-    pad_img = cv2.copyMakeBorder(resize_img, top, bottom, left, right, cv2.BORDER_CONSTANT,
-                                 value=[0, 0, 0])  # 从图像边界向上,下,左,右扩的像素数目
-
-    return pad_img
-
-
+def center_resize(img, new_width, new_height):
+    
+    h, w = img.shape[:2]
+    if w == h and new_width==new_height:
+        if w == new_width:
+            return img
+        else:
+            image = cv2.resize(img, (new_width, new_height))
+            return image
+        
+    if w==new_width and h==new_height:
+        return img
+    
+    return img
