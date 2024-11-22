@@ -1,6 +1,7 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
 import datetime
+import logging
 import os
 import torch
 from PIL import Image
@@ -16,6 +17,7 @@ from .src.utils.mp_utils  import LMKExtractor
 from .src.utils.img_utils import pils_from_video
 from .src.utils.motion_utils import motion_sync
 from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle
+from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
 
@@ -23,6 +25,117 @@ weight_dtype = torch.float16
 cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
+
+
+def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
+                   context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
+                  save_video, pose_dir, audio_file_prefix,):
+    
+    if pose_dir=="none":
+        logging.warning("when use echo v2,need choice a pose dir,for get error using default pose !")
+        pose_dir=os.path.join(cur_path,"echomimic_v2/assets/halfbody_demo/pose/01")
+    if seed is not None and seed > -1:
+        
+        generator = torch.manual_seed(seed)
+    else:
+        generator = torch.manual_seed(random.randint(100, 1000000))
+    
+    final_fps = fps
+    
+    # ref_images_dir = f'assets/halfbody_demo/refimag'
+    # audio_dir = 'assets/halfbody_demo/audio'
+    # pose_dir = 'assets/halfbody_demo/pose'
+    #
+    # refimg_name = 'natural_bk_openhand/0035.png'
+    # audio_name = 'chinese/echomimicv2_woman.wav'
+    #pose_name = '01'
+    
+    # inputs_dict = {
+    #     "refimg": f'{ref_images_dir}/{refimg_name}',
+    #     "audio": f'{audio_dir}/{audio_name}',
+    #     "pose": f'{pose_dir}/{pose_name}',
+    # }
+    
+    start_idx = 0
+    
+    # print('Pose:', inputs_dict['pose'])
+    # print('Reference:', inputs_dict['refimg'])
+    # print('Audio:', inputs_dict['audio'])
+    
+    # ref_flag = '.'.join([refimg_name.split('/')[-2], refimg_name.split('/')[-1]])
+    #
+    # save_path = Path(f"{save_dir}/{ref_flag}/{pose_name}")
+    #
+    # save_path.mkdir(exist_ok=True, parents=True)
+    # ref_s = refimg_name.split('/')[-1].split('.')[0]
+    # save_name = f"{save_path}/{ref_s}-a-{audio_name}-i{start_idx}"
+    
+    audio_clip = AudioFileClip(uploaded_audio)
+    
+    L = min(int(audio_clip.duration * final_fps),len(os.listdir(pose_dir))) # if above will cause error
+    print(L)
+    
+    pose_list = []
+    for index in range(start_idx, start_idx + L):
+        tgt_musk = np.zeros((width, height, 3)).astype('uint8')
+        tgt_musk_path = os.path.join(pose_dir, "{}.npy".format(index))
+        detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
+        imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']
+        im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)
+        im = np.transpose(np.array(im), (1, 2, 0))
+        tgt_musk[rb:re, cb:ce, :] = im
+        
+        tgt_musk_pil = Image.fromarray(np.array(tgt_musk)).convert('RGB')
+        pose_list.append(
+            torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device=device).permute(2, 0, 1) / 255.0)
+    
+    poses_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
+    print(f"poses_tensor:{poses_tensor.shape}")
+    # audio_clip = AudioFileClip(audio_clip)
+    #
+    # audio_clip = audio_clip.set_duration(L / final_fps)
+ 
+    video = pipe(
+        ref_image_pil,
+        uploaded_audio,
+        poses_tensor[:, :, :L, ...],
+        width,
+        height,
+        L,
+        steps,
+        cfg,
+        generator=generator,
+        audio_sample_rate=sample_rate,
+        context_frames=context_frames,
+        fps=final_fps,
+        context_overlap=context_overlap,
+        start_idx=start_idx,
+    ).videos
+    
+    final_length = min(video.shape[2], L)
+    video_sig = video[:, :, :final_length, :, :]
+    output_file = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_echo.mp4")
+    print(f"**** final_length is : {final_length} ****")
+    
+    ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video)
+
+    if save_video:
+        output_video_path = os.path.join(folder_paths.output_directory, f"{audio_file_prefix}_audio.mp4")
+        video_clip = VideoFileClip(output_file)
+        audio_clip = AudioFileClip(uploaded_audio)
+        final_clip = video_clip.set_audio(audio_clip)
+        final_clip.write_videofile(
+            output_video_path,
+            codec="libx264", audio_codec="aac")
+        print(f"**** saving{output_file} at {output_video_path} ****")
+        video_clip.reader.close()
+        audio_clip.close()
+        final_clip.reader.close()
+    return ouput_list
+
+
+
+
 
 def process_video(face_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
                   facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
