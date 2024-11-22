@@ -85,7 +85,7 @@ def save_videos_from_pil(pil_images, path, fps=8, audio_path=None):
 
 
 
-def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=False, n_rows=6, fps=8,save_video=False):
+def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=False, n_rows=6, fps=8,save_video=False,size=None):
     videos = rearrange(videos, "b c t h w -> t b c h w")
     height, width = videos.shape[-2:]
     outputs = []
@@ -96,6 +96,8 @@ def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=F
         if rescale:
             x = (x + 1.0) / 2.0  # -1,1 -> 0,1
         x = (x * 255).numpy().astype(np.uint8)
+        if size:
+            x=center_crop(x,size[0],size[1])
         x = Image.fromarray(x)
 
         outputs.append(x)
