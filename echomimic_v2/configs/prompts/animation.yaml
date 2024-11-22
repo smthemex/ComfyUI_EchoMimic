@@ -1,0 +1,13 @@
+pretrained_base_model_path: "./pretrained_weights/sd-image-variations-diffusers"
+pretrained_vae_path: "./pretrained_weights/sd-vae-ft-mse"
+image_encoder_path: "./pretrained_weights/sd-image-variations-diffusers/image_encoder"
+denoising_unet_path: "./pretrained_weights/denoising_unet-45000.pth"
+reference_unet_path: "./pretrained_weights/reference_unet-45000.pth"
+face_locator_path: "./pretrained_weights/face_locator-45000.pth"
+motion_module_path: "/nas2/juzhen.czy/exp_output_0613/stage2_whisper_xinwenlianbo_HDTF_pretrain_auged/motion_module-40000.pth"
+audio_mapper_path: "./pretrained_weights/audio_mapper-50000.pth"
+auido_guider_path: "./pretrained_weights/wav2vec2-base-960h"
+auto_flow_path: "./pretrained_weights/AutoFlow"
+
+inference_config: "./configs/inference/inference_v2.yaml"
+weight_dtype: 'fp16'
