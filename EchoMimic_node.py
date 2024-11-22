@@ -27,7 +27,6 @@ from .echomimic_v2.src.pipelines.pipeline_echomimicv2 import EchoMimicV2Pipeline
 from .echomimic_v2.src.models.unet_2d_condition import UNet2DConditionModel as UNet2DConditionModelV2
 from .echomimic_v2.src.models.unet_3d_emo import  EMOUNet3DConditionModel as EMOUNet3DConditionModelV2
 from .hallo.video_sr import run_realesrgan, pre_u_loader
-from facenet_pytorch import MTCNN
 from pathlib import Path
 from huggingface_hub import hf_hub_download
 import folder_paths
@@ -117,7 +116,7 @@ class Echo_LoadModel:
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync": ("BOOLEAN", {"default": False},),
                 "lowvram": ("BOOLEAN", {"default": False},),
-                "version": (["V1", "V2", ],),
+                "version": (["V2", "V1", ],),
             }
         }
     
@@ -317,6 +316,7 @@ class Echo_LoadModel:
         
         ## load face detector params
         if version == "V1":
+            from facenet_pytorch import MTCNN
             face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
                                   post_process=True, device=device)
         else:
