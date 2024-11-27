@@ -11,7 +11,10 @@ import sys
 import pickle
 import torchaudio
 from huggingface_hub import hf_hub_download
-from moviepy import *
+try:
+    from moviepy.editor import *
+except:
+    from moviepy import *
 import random
 from .src.utils.mp_utils  import LMKExtractor
 from .src.utils.img_utils import pils_from_video
