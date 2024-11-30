@@ -7,7 +7,10 @@ You can using EchoMimic & EchoMimic V2 in comfyui
 ---
 
 ## Updates:
-**2024/11/22**  
+**2024/11/30**  
+* 非官方实现手势自定义,需要借助我的另一个插件[sapiens](https://github.com/smthemex/ComfyUI_Sapiens),直接分离视频的手势并存为npy文件,然后将包含npy文件夹放在comfyUI/input/tensorrt_lite下，然后在V2模式下，从pose_dir菜单选择包含npy文件的文件名，即可使用自定义手势。
+
+
 * Support Echomimic_v2，You only need to select version v2 to use it.The pose synchronization code for V2 has not been entered yet. When selecting the pose path as None, the official default pose file will be used；
 * V2 has a high demand for Vram, even 24GB can be quite challenging. If you want to try it out, it is recommended to turn on LowRAM. Although it is slow, it can still be used.
 * 你只需要将version 选成v2即可使用;V2的姿态同步代码暂未录入，pose路径选择为None的时候使用官方默认的pose文件。
