@@ -44,6 +44,9 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     if pose_dir=="none":
         logging.warning("when use echo v2,need choice a pose dir,for get error using default pose !")
         pose_dir=os.path.join(cur_path,"echomimic_v2/assets/halfbody_demo/pose/01")
+    else:
+        logging.info("Use NPY files for custom videos, which must be located in directory comfyui/input/tensorrt_lite")
+        pose_dir = os.path.join(tensorrt_lite, pose_dir)
     if seed is not None and seed > -1:
         
         generator = torch.manual_seed(seed)
@@ -62,11 +65,18 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     for index in range(start_idx, start_idx + L):
         #tgt_musk = np.zeros((width, height, 3)).astype('uint8')
         tgt_musk_path = os.path.join(pose_dir, "{}.npy".format(index))
-        detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
-        imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']
-        #print(imh_new, imw_new, rb, re, cb, ce)
-        im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)
-        im = np.transpose(np.array(im), (1, 2, 0))
+        if pose_dir == "none":
+            detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
+            imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']
+            # print(imh_new, imw_new, rb, re, cb, ce)
+            im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)
+            im = np.transpose(np.array(im), (1, 2, 0))
+        else:
+            im = np.load(tgt_musk_path, allow_pickle=True)
+            rb = 0
+            cb = 0
+            re = im.shape[:2][1]
+            ce = im.shape[:2][0]
         new_H,new_W=im.shape[:2]
         tgt_musk = np.zeros((new_W, new_H, 3)).astype('uint8')
         tgt_musk[rb:re, cb:ce, :] = im
