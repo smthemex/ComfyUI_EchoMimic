@@ -1,21 +1,17 @@
 # ComfyUI_EchoMimic
 You can using EchoMimic & EchoMimic V2 in comfyui
 
-[EchoMimici](https://github.com/BadToBest/EchoMimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
+[Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
 
 ---
 
 ## Updates:
-**2024/11/30**  
+**2024/12/02**  
+* 修复使用自定义pose可能会遇见的非正方形蒙版错误，修复crop错误，让横板输入、竖版输出，或者竖版输入、横板输出的人物不再变形。（见示例图）  
+* Fix non square mask errors that may be encountered when using custom poses, fix crop errors to prevent characters from deforming when using horizontal input or vertical output, or when using vertical input or horizontal output. (See example image)
+  
 * 非官方实现手势自定义,需要借助我的另一个插件[sapiens](https://github.com/smthemex/ComfyUI_Sapiens),直接分离视频的手势并存为npy文件,然后将包含npy文件夹放在comfyUI/input/tensorrt_lite下，然后在V2模式下，从pose_dir菜单选择包含npy文件的文件名，即可使用自定义手势。
-
-
-* Support Echomimic_v2，You only need to select version v2 to use it.The pose synchronization code for V2 has not been entered yet. When selecting the pose path as None, the official default pose file will be used；
-* V2 has a high demand for Vram, even 24GB can be quite challenging. If you want to try it out, it is recommended to turn on LowRAM. Although it is slow, it can still be used.
-* 你只需要将version 选成v2即可使用;V2的姿态同步代码暂未录入，pose路径选择为None的时候使用官方默认的pose文件。
-* V2对Vram需求较大，即便是24G也会比较吃力，如果要尝鲜，建议开启lowram，虽然很慢，但是能用，我需要点时间来优化。 
-
 ---
 
 # 1. Installation
@@ -152,6 +148,10 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 
 # 4 Example
 -----
+* V2自定义pose输入及不同尺寸的裁剪，V2Custom pose input and cropping of different sizes
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/cropB.png)
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/cropC.png)
+
 * Echomimic_v2 use default pose  new version 使用官方默认的pose文件 
 ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/v2.gif)
 
@@ -179,7 +179,6 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 --infer_mode：参考pkl模型文件视频pose生成 "pose_normal", "pose_acc"；   
     ----motion_sync：如果打开且video_file有视频文件时，生成pkl文件，并生成参考视频的视频；pkl文件在input\tensorrt_lite 目录下，再次使用需要重启comfyUI。   
     ----motion_sync：如果关闭且pose_mode不为none的时候，读取选定的pose_mode目录名的pkl文件，生成pose视频；如果pose_mode为空的时候，生成基于默认assets\test_pose_demo_pose的视频   
-    ----audio_from_video：仅在motion_sync开启，且video_file有视频文件时可用，可用提取video_file的视频文件的声音，请确保该视频有声音，且为mp4格式。  
  
 **特别的选项**：  
    --save_video：如果不想使用VH节点时，可以开启，默认关闭；     
@@ -195,7 +194,7 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 **Infer_rode**: Refer to the PKL model file to generate "pose_normal" and "pose_acc" for the video pose;   
 **Motion_Sync**: If opened and there is a video file in videoFILE, generate a pkl file and generate a reference video for the video; The pkl file is located in the input \ sensorrt_lite directory. To use it again, you need to restart ComfyUI.    
 **Motion_Sync**: If turned off and pose_mode is not 'none', read the pkl file of the selected pose_mode directory name and generate a pose video; If pose_mode is empty, generate a video based on the default assets \ test_pose_demo_pose    
-**Audio_from**-video: Only available when motion_stync is enabled and videoFILE has video files, it can extract the sound from videoFILE's video files. Please ensure that the video has sound and is in mp4 format.   
+
  
 **Special options:**   
 --**Save_video**: If you do not want to use VH nodes, it can be turned on and turned off by default;   
@@ -209,14 +208,19 @@ Special attention should be paid to:
 ---
 
 **既往更新：**   
+* 你只需要将version 选成v2即可使用;V2的姿态同步代码暂未录入，pose路径选择为None的时候使用官方默认的pose文件。
+* V2对Vram需求较大，即便是24G也会比较吃力，如果要尝鲜，建议开启lowram，虽然很慢，但是能用，我需要点时间来优化。 
 * 修复面部裁切的bug，修复非正方形人物变形的bug，视频驱动改成只能用其他视频加载节点比如VH或者用已生成好的pkl模型驱动；
 * 增加detection_Resnet50_Final.pth 和RealESRGAN_x2plus.pth自动下载的代码，首次使用，保持realesrgan和face_detection_model菜单为‘none’（无）时就会自动下载，如果菜单里已有模型，请选择模型。    
 * 新增hallo2的2倍放大节点，输入视频的尺寸必须是512 * 512方形，输出为1024 * 1024
 * 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
 * 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
 * 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
-  
+
+
 **Previous updates：**   
+* Support Echomimic_v2，You only need to select version v2 to use it.The pose synchronization code for V2 has not been entered yet. When selecting the pose path as None, the official default pose file will be used；
+* V2 has a high demand for Vram, even 24GB can be quite challenging. If you want to try it out, it is recommended to turn on LowRAM. Although it is slow, it can still be used.
 * Fix the bug of facial cropping, fix the bug of non square character deformation, and change the video driver to only use other video loading nodes such as VH or use the generated pkl model driver;  
 * ﻿The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;     
 * facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切  
