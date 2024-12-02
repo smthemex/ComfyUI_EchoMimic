@@ -17,7 +17,6 @@ except:
     from moviepy import *
 import random
 from .src.utils.mp_utils  import LMKExtractor
-from .src.utils.img_utils import pils_from_video
 from .src.utils.motion_utils import motion_sync
 from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle,center_crop
 from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
@@ -35,14 +34,15 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                   save_video, pose_dir, audio_file_prefix,):
     origin_h = height
     origin_w = width
-    if width!=height:
-        max_l=max(width,height)
-        width=max_l
-        height = max_l
-    ref_image_pil = nomarl_upscale(ref_image_pil, width, height)
-    
+    # 处理输入图片的尺寸
+    panding_img=img_padding(height, width, ref_image_pil)# 不管输出图片是何种尺寸，为保证图片质量，将输入图片转为为正方形，横裁切，竖填充，长宽为输出尺寸最大
+    infer_image_pil=Image.fromarray(cv2.cvtColor(panding_img,cv2.COLOR_BGR2RGB))
+    #将高宽改成最大图幅，方便裁切
+    height = max(height,width)
+    width = max(height, width)
+ 
     if pose_dir=="none":
-        logging.warning("when use echo v2,need choice a pose dir,for get error using default pose !")
+        logging.info("when use echo v2,need choice a pose dir,using default pose for testing !")
         pose_dir=os.path.join(cur_path,"echomimic_v2/assets/halfbody_demo/pose/01")
         USE_Default=True
     else:
@@ -50,7 +50,6 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         pose_dir = os.path.join(tensorrt_lite, pose_dir)
         USE_Default = False
     if seed is not None and seed > -1:
-        
         generator = torch.manual_seed(seed)
     else:
         generator = torch.manual_seed(random.randint(100, 1000000))
@@ -65,24 +64,18 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     
     pose_list = []
     for index in range(start_idx, start_idx + L):
-        #tgt_musk = np.zeros((width, height, 3)).astype('uint8')
         tgt_musk_path = os.path.join(pose_dir, "{}.npy".format(index))
         if USE_Default:
             detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
-            imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']
-            # print(imh_new, imw_new, rb, re, cb, ce)
-            im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)
+            imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']  #print(imh_new, imw_new, rb, re, cb, ce) 官方示例蒙版的尺寸是768*768
+            im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800) #缩放比例为1，im也是768 ref_w！=768
             im = np.transpose(np.array(im), (1, 2, 0))
+            tgt_musk = np.zeros((imw_new, imh_new, 3)).astype('uint8')
+            tgt_musk[rb:re, cb:ce, :] = im
         else:
-            im = np.load(tgt_musk_path, allow_pickle=True)
-            rb = 0
-            cb = 0
-            re = im.shape[:2][1]
-            ce = im.shape[:2][0]
-        new_H,new_W=im.shape[:2]
-        tgt_musk = np.zeros((new_W, new_H, 3)).astype('uint8')
-        tgt_musk[rb:re, cb:ce, :] = im
-        tgt_musk = center_resize(tgt_musk, width, height)
+            tgt_musk = np.load(tgt_musk_path, allow_pickle=True)
+       
+        tgt_musk = center_resize_pad(tgt_musk, width, height) # 缩放裁剪遮罩，防止遮罩非正方形
         tgt_musk_pil = Image.fromarray(np.array(tgt_musk)).convert('RGB')
         
         pose_list.append(
@@ -95,7 +88,7 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     # audio_clip = audio_clip.set_duration(L / fps)
  
     video = pipe(
-        ref_image_pil,
+        infer_image_pil,
         uploaded_audio,
         poses_tensor[:, :, :L, ...],
         width,
@@ -117,7 +110,7 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     print(f"**** final_length is : {final_length} ****")
     
     if origin_h!=origin_w:
-        ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video,size=(origin_w,origin_h))
+        ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video,size=(origin_w,origin_h),ref_image_pil=ref_image_pil)
     else:
         ouput_list = save_videos_grid(video_sig, output_file, n_rows=1, fps=fps, save_video=save_video)
 
@@ -558,17 +551,37 @@ def cf_tensor2cv(tensor,width, height):
     cv_img=tensor2cv(cr_tensor)
     return cv_img
 
-def center_resize(img, new_width, new_height):
-    
+def center_resize_pad(img, new_width, new_height):#为简化，new已是正方形
     h, w = img.shape[:2]
-    if w == h and new_width==new_height:
+    if w == h:
         if w == new_width:
             return img
         else:
-            image = cv2.resize(img, (new_width, new_height))
-            return image
+            return cv2.resize(img, (new_width, new_height))
+    else: #蒙版也有可能不是正方形
+        if h > w:  # 竖直图左右填充
+            s = max(h, w)
+            f = np.zeros((s, s, 3), np.uint8)
+            ax, ay = (s - img.shape[1]) // 2, (s - img.shape[0]) // 2
+            f[ay:img.shape[0] + ay, ax:ax + img.shape[1]] = img
+        else:
+            f = center_crop(img, h, h)
+        return cv2.resize(f, (new_width, new_height))
+
         
-    if w==new_width and h==new_height:
-        return img
-    
-    return img
+
+def img_padding(height,width,ref_image_pil):
+    output_max = max(height, width)
+    img = tensor2cv(ref_image_pil)
+    h, w = img.shape[:2]
+    if h==w:
+        return cv2.resize(img, (output_max,output_max), interpolation=cv2.INTER_AREA)
+    else:
+        if h > w: #竖直图左右填充
+            s = max(h, w)
+            f = np.zeros((s, s, 3), np.uint8)
+            ax, ay = (s - img.shape[1]) // 2, (s - img.shape[0]) // 2
+            f[ay:img.shape[0] + ay, ax:ax + img.shape[1]] = img
+        else:
+            f=center_crop(img, h, h)
+        return f
