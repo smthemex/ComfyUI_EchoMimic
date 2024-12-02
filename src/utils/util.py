@@ -85,7 +85,7 @@ def save_videos_from_pil(pil_images, path, fps=8, audio_path=None):
 
 
 
-def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=False, n_rows=6, fps=8,save_video=False,size=None):
+def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=False, n_rows=6, fps=8,save_video=False,size=None,ref_image_pil=None):
     videos = rearrange(videos, "b c t h w -> t b c h w")
     height, width = videos.shape[-2:]
     outputs = []
@@ -95,12 +95,39 @@ def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=F
         x = x.transpose(0, 1).transpose(1, 2).squeeze(-1)  # (h w c)
         if rescale:
             x = (x + 1.0) / 2.0  # -1,1 -> 0,1
-        x = (x * 255).numpy().astype(np.uint8)
+        z = (x * 255).numpy().astype(np.uint8) #方形
         if size:
-            x=center_crop(x,size[0],size[1])
-        x = Image.fromarray(x)
+            origin_w,origin_h=size
+            if origin_h>origin_w:#竖
+               z=center_crop(z,origin_w,origin_h) #竖图直接裁切
+            else: # 横 max是w
+                img = tensor2cv(ref_image_pil)
+                h, w = img.shape[:2]
+                if h>=w: #防止输入竖图或正方，想要横图的人才
+                    img_bg = np.zeros((origin_h,origin_w, 3), np.uint8)
+                    img_fg = cv2.resize(z, (origin_h, origin_h))  # 缩放到输出高度
+                    z = img_coty2_img(img_bg, img_fg)  # 回帖
+                else: #输入横图，输出也是横图，尝试回贴
+                    ratio=h/origin_h# 高固定
+                    new_w = int(w / ratio)
+                    img_input_new = cv2.resize(img, (new_w, origin_h))  # 原图缩放到输出高度
+                    
+                    if new_w>origin_w: #原图缩放后宽度超过输出尺寸
+                        img_bg=center_crop(img_input_new, origin_w, origin_h) # 中心裁切做背景
+                        img_fg = cv2.resize(z, (origin_h, origin_h))  # 缩放到输出高度
+                        z =img_coty2_img(img_bg,img_fg) #回帖
+                    else: #原图缩放后宽度小于等于输出尺寸
+                        
+                        img_bg = np.zeros((origin_h,origin_w, 3), np.uint8)
+                        img_fg = cv2.resize(img_input_new, (origin_h, origin_h))  # 缩放原图到输出高度
+                        img_bg = img_coty2_img(img_bg, img_fg)  # 获得带黑底的背景图
+    
+                        img_fg = cv2.resize(z, (origin_h, origin_h))  # 缩放实际图到输出高度
+                        z = img_coty2_img(img_bg, img_fg)  # 回帖
 
-        outputs.append(x)
+        z = Image.fromarray(z)
+
+        outputs.append(z)
     #os.makedirs(os.path.dirname(path), exist_ok=True)
     if save_video:
         save_videos_from_pil(outputs, path, fps, audio_path=audio_path)
@@ -108,6 +135,21 @@ def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=F
     return outputs
 
 
+def img_coty2_img(img_bg,img_fg):
+    h_fg, w_fg = img_fg.shape[:2]
+    h_bg, w_bg = img_bg.shape[:2]
+    # 计算居中位置
+    x = int((w_bg - w_fg) / 2)
+    y = int((h_bg - h_fg) / 2)
+    # 确保坐标不会是负数
+    x = max(0, x)
+    y = max(0, y)
+    # 确保不会超出大图像的边界
+    x = min(x, w_bg - w_fg)
+    y = min(y, h_bg - h_fg)
+    # 使用NumPy索引将小图像粘贴到大图像上
+    img_bg[y:y + h_fg, x:x + w_fg] = img_fg
+    return img_bg
 
 
 def read_frames(video_path):
