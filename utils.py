@@ -584,4 +584,5 @@ def img_padding(height,width,ref_image_pil):
             f[ay:img.shape[0] + ay, ax:ax + img.shape[1]] = img
         else:
             f=center_crop(img, h, h)
-        return f
+        
+        return cv2.resize(f, (output_max,output_max), interpolation=cv2.INTER_AREA)
