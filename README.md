@@ -7,11 +7,11 @@ You can using EchoMimic & EchoMimic V2 in comfyui
 ---
 
 ## Updates:
-**2024/12/02**  
-* 修复使用自定义pose可能会遇见的非正方形蒙版错误，修复crop错误，让横板输入、竖版输出，或者竖版输入、横板输出的人物不再变形。（见示例图）  
-* Fix non square mask errors that may be encountered when using custom poses, fix crop errors to prevent characters from deforming when using horizontal input or vertical output, or when using vertical input or horizontal output. (See example image)
-  
-* 非官方实现手势自定义,需要借助我的另一个插件[sapiens](https://github.com/smthemex/ComfyUI_Sapiens),直接分离视频的手势并存为npy文件,然后将包含npy文件夹放在comfyUI/input/tensorrt_lite下，然后在V2模式下，从pose_dir菜单选择包含npy文件的文件名，即可使用自定义手势。
+**2024/12/04**  
+* V2版现在跟V1一样，有三种pose驱动方式，第一种，infer_mode选择audio_drive,pose_dir 选择none，则使用默认的npy pose文件，第二种，infer_mode选择audio_drive,pose_dir 选择已有的npy文件夹（位于...ComfyUI/input/tensorrt_lite目录下），第三种，infer_mode选择pose_normal,video_images连接视频入口，确认...ComfyUI/models/echo_mimic 下有yolov8m.pt 和sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2 模型 （见图示和example里的工作流,下载地址见后附）；
+* The V2 version now has three different pose driving modes, just like the V1 version. The first one is to select ‘audio-drive’ for 'infer_mode' and 'none' for 'pose_dir', using the default '*.npy' pose files. The second one is to select audio-drive for infer_mode and an existing '*.npy' folder (located in the... ComfyUI/input/tensorrt_lite directory) for pose_dir. The third one is to select 'pose_normal' for 'infer_mode', connect to the video portal with video_images, and confirm Under ComfyUI/models/echo_mimic, there are 'YOLOV8m.pt' and 'sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2' models (see the workflow in the diagram and example,Please see the download link below)
+* 因为调用了sapiens的pose方法，所以需要安装yolo的库ultralytics ，安装方法：  pip install ultralytics  
+* Because the pose method of ‘Sapiens’ was called, it is necessary to install YOLO's library ultralytics. Installation method： pip install ultralytics  
 ---
 
 # 1. Installation
@@ -133,7 +133,8 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 |         ├── reference_unet_pose.pth
 ```
 
-3.2 v2 version use model below V2, Automatic download, you can manually add it 使用以下模型,使用及自动下载,你可以手动添加:  
+**3.2 v2 version**   
+use model below V2, Automatic download, you can manually add it 使用以下模型,使用及自动下载,你可以手动添加:    
 模型地址address:[huggingface](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)
 ```
 ├── ComfyUI/models/echo_mimic/v2
@@ -142,14 +143,23 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 |         ├── pose_encoder.pth
 |         ├── reference_unet.pth
 ```
-
+YOLOm8 [download link](https://huggingface.co/Ultralytics/YOLOv8/tree/main)   
+sapiens pose [download link](https://huggingface.co/facebook/sapiens-pose-1b-torchscript/tree/main)  
+sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地址](https://github.com/smthemex/ComfyUI_Sapiens)   
+```
+├── ComfyUI/models/echo_mimic
+|         ├── yolov8m.pt
+|         ├── sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2  or/或者 sapiens_1b_goliath_best_goliath_AP_639_torchscript_fp16.pt2
+```
 
 ---
 
 # 4 Example
 -----
-* V2自定义pose输入及不同尺寸的裁剪，V2Custom pose input and cropping of different sizes
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/cropB.png)
+* V2加载自定义视频驱动视频，V2 loads custom video driver videos  
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/example.png)
+
+* V2选择自定义pose驱动视频，V2 Choose Custom Pose Driver Video   
 ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/cropC.png)
 
 * Echomimic_v2 use default pose  new version 使用官方默认的pose文件 
@@ -207,25 +217,20 @@ Special attention should be paid to:
 
 ---
 
-**既往更新：**   
-* 你只需要将version 选成v2即可使用;V2的姿态同步代码暂未录入，pose路径选择为None的时候使用官方默认的pose文件。
-* V2对Vram需求较大，即便是24G也会比较吃力，如果要尝鲜，建议开启lowram，虽然很慢，但是能用，我需要点时间来优化。 
-* 修复面部裁切的bug，修复非正方形人物变形的bug，视频驱动改成只能用其他视频加载节点比如VH或者用已生成好的pkl模型驱动；
+**既往更新：**  
+
 * 增加detection_Resnet50_Final.pth 和RealESRGAN_x2plus.pth自动下载的代码，首次使用，保持realesrgan和face_detection_model菜单为‘none’（无）时就会自动下载，如果菜单里已有模型，请选择模型。    
 * 新增hallo2的2倍放大节点，输入视频的尺寸必须是512 * 512方形，输出为1024 * 1024
-* 当你用torch 2.2.0+cuda 成功安装最新的opencv-python库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
+* 当你用torch 2.2.0+cuda 成功安装最新的facenet-pytorch库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
 * 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
 * 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
 
 
 **Previous updates：**   
-* Support Echomimic_v2，You only need to select version v2 to use it.The pose synchronization code for V2 has not been entered yet. When selecting the pose path as None, the official default pose file will be used；
-* V2 has a high demand for Vram, even 24GB can be quite challenging. If you want to try it out, it is recommended to turn on LowRAM. Although it is slow, it can still be used.
-* Fix the bug of facial cropping, fix the bug of non square character deformation, and change the video driver to only use other video loading nodes such as VH or use the generated pkl model driver;  
 * ﻿The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;     
 * facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切  
 * Add upscale model and Resnet model auto download codes（if had ，they in comfyUI/models/upscale_models/RealESRGAN_x2plus.pth and comfyUI/models/Hallo/facelib/detection_Resnet50_Final.pth）， first use ，keep “realesrgan” and “face_detection_model” ‘none’ will auto download.. 
-* After successfully installing the latest OpenCV Python library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch torch vision torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
+* After successfully installing the latest ‘facenet-pytorch’ library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch、 torch vision、 torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
 * Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
 
   
@@ -267,6 +272,14 @@ hallo2
 	primaryClass={cs.CV}
 }
 ```
-
+sapiens
+```
+@article{khirodkar2024sapiens,
+  title={Sapiens: Foundation for Human Vision Models},
+  author={Khirodkar, Rawal and Bagautdinov, Timur and Martinez, Julieta and Zhaoen, Su and James, Austin and Selednik, Peter and Anderson, Stuart and Saito, Shunsuke},
+  journal={arXiv preprint arXiv:2408.12569},
+  year={2024}
+}
+```
 
 
