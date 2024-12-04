@@ -9,12 +9,15 @@ import numpy as np
 import cv2
 import sys
 import pickle
-import torchaudio
+import gc
 from huggingface_hub import hf_hub_download
 try:
-    from moviepy.editor import *
+    from moviepy.editor import  VideoFileClip, AudioFileClip
 except:
-    from moviepy import *
+    try:
+        from moviepy import VideoFileClip, AudioFileClip
+    except:
+        from moviepy import *
 import random
 from .src.utils.mp_utils  import LMKExtractor
 from .src.utils.motion_utils import motion_sync
@@ -22,7 +25,7 @@ from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangl
 from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
-
+from tqdm import tqdm
 weight_dtype = torch.float16
 cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -31,24 +34,80 @@ tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
 
 def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                    context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
-                  save_video, pose_dir, audio_file_prefix,):
+                  save_video, pose_dir, audio_file_prefix,visualizer,video_images):
     origin_h = height
     origin_w = width
     # 处理输入图片的尺寸
-    panding_img=img_padding(height, width, ref_image_pil)# 不管输出图片是何种尺寸，为保证图片质量，将输入图片转为为正方形，横裁切，竖填充，长宽为输出尺寸最大
+    panding_img=img_padding(height, width, ref_image_pil) # 不管输出图片是何种尺寸，为保证图片质量，将输入图片转为为正方形，横裁切，竖填充，长宽为输出尺寸最大
     infer_image_pil=Image.fromarray(cv2.cvtColor(panding_img,cv2.COLOR_BGR2RGB))
     #将高宽改成最大图幅，方便裁切
     height = max(height,width)
     width = max(height, width)
  
-    if pose_dir=="none":
-        logging.info("when use echo v2,need choice a pose dir,using default pose for testing !")
-        pose_dir=os.path.join(cur_path,"echomimic_v2/assets/halfbody_demo/pose/01")
-        USE_Default=True
-    else:
-        logging.info("Use NPY files for custom videos, which must be located in directory comfyui/input/tensorrt_lite")
-        pose_dir = os.path.join(tensorrt_lite, pose_dir)
+    if visualizer and isinstance(video_images,torch.Tensor):
+        logging.info("***** start infer video to npy files for drive pose ! ***** ")
+        video_len, _, _, _ = video_images.size()
+        if video_len < 50:
+            raise "input video has not much frames for driver,change your input video!"
+        else:
+            tensor_list = list(torch.chunk(video_images, chunks=video_len))
+            input_frames_cv2 = [img_padding(height,width,i) for i in tensor_list]
+        pose_dir = os.path.join(tensorrt_lite, audio_file_prefix)
+        if not os.path.exists(pose_dir):
+            os.makedirs(pose_dir)
+        else:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            pose_dir = os.path.join(tensorrt_lite, f"{audio_file_prefix}_{timestamp}")
+            os.makedirs(pose_dir)
+        visualizer.move_to_cuda()
+        
+        # 首帧手势对齐输入图片，keypoint数据左眼，肩膀及手肘，
+        _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[0]),None)
+        _, input_key, input_box_xy = visualizer(np.asarray(panding_img),None)
+        first_length,first_left_eye_y=estimate_ratio(first_key,first_box_xy)
+        input_length,input_left_eye_y = estimate_ratio(input_key,input_box_xy)
+        #print(first_length,first_left_eye_y,input_length,input_left_eye_y) #160.0 [236.0] 158.0 [151.0] 眼睛高度为绝对值
+        if first_length and first_left_eye_y and input_length and input_left_eye_y:
+            if abs(input_length / height - first_length / height) > 0.005:  # 比例不同须基于输入图片对齐
+                logging.info(
+                    "Starting the first frame gesture alignment based on the input image *** 基于输入图片，开始首帧手势缩放对齐 !")
+                input_left_eye_y_=input_left_eye_y[0]
+                first_left_eye_y_=first_left_eye_y[0]
+                input_frames_cv2=[align_img(input_length, first_length, height, width, i, input_left_eye_y_,
+                          first_left_eye_y_) for i in input_frames_cv2]
+            else:# 人体比例接近，但是高度不对，也需要对齐
+                logging.info(
+                    "Starting the first frame shift based on the input image *** 基于输入图片，开始首帧手势平移对齐 !")
+                if abs(input_left_eye_y[0] / height - first_left_eye_y[
+                    0] / height) > 0.005:
+                    input_frames_cv2 = [affine_img(input_left_eye_y, first_left_eye_y, i) for i in input_frames_cv2]
+        
+        xxx=input_frames_cv2
+        for i,xx in enumerate(xxx):
+            cv2.imwrite(f"{i}.png",xx)
+            if i >2:
+                break
+        
+        index = 0
+        for i in tqdm(input_frames_cv2):
+            pose_img,_,_=visualizer(np.asarray(i),[5])
+            np.save(os.path.join(pose_dir, f"{index}"), pose_img)
+            index+=1
         USE_Default = False
+        visualizer.enable_model_cpu_offload()
+        gc.collect()
+        torch.cuda.empty_cache()
+    else:
+        if pose_dir == "none":
+            logging.info("when use echo v2,need choice a pose dir,using default pose for testing !")
+            pose_dir = os.path.join(cur_path, "echomimic_v2/assets/halfbody_demo/pose/01")
+            USE_Default = True
+        else:
+            logging.info(
+                "Use NPY files for custom videos, which must be located in directory comfyui/input/tensorrt_lite")
+            pose_dir = os.path.join(tensorrt_lite, pose_dir)
+            USE_Default = False
+        
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
     else:
@@ -580,9 +639,87 @@ def img_padding(height,width,ref_image_pil):
         if h > w: #竖直图左右填充
             s = max(h, w)
             f = np.zeros((s, s, 3), np.uint8)
-            ax, ay = (s - img.shape[1]) // 2, (s - img.shape[0]) // 2
-            f[ay:img.shape[0] + ay, ax:ax + img.shape[1]] = img
+            ax, ay = (s - w) // 2, (s - h) // 2
+            f[ay:h + ay, ax:ax + w] = img
         else:
             f=center_crop(img, h, h)
         
         return cv2.resize(f, (output_max,output_max), interpolation=cv2.INTER_AREA)
+        
+def estimate_ratio(keypoint: list,box_xy,length=None):
+    left_eye_y = []
+    left_shoulder_y = []
+    left_elbow_y = []
+    for i, (name, (x, y, conf)) in enumerate(keypoint[0].items()):
+        if name == "left_eye":
+            if conf > 0.3:
+                left_eye_y.append(y)
+        if name == "left_shoulder":
+            if conf > 0.3:
+                left_shoulder_y.append(y)
+        if name == "left_elbow":
+            if conf > 0.3:
+                left_elbow_y.append(y)
+    
+    if left_eye_y and left_elbow_y:
+        length=left_elbow_y[0] - left_eye_y[0]
+    elif left_eye_y and left_shoulder_y and not left_elbow_y :
+        length = left_shoulder_y[0] - left_eye_y[0]
+    else:
+        pass
+    if left_eye_y:
+        left_eye_y=[left_eye_y[0]+box_xy[0]] #眼部的实际高度要加上box的边界
+    return length,left_eye_y
+
+
+def align_img(input_length, first_length, height, width, input_frames_cv2_first, input_left_eye_y, first_left_eye_y):
+    ratio = input_length / first_length  #  82.0 [50.0] 76.0 [41.0] f f  in in
+    
+    base_image=np.zeros((height, width,3), np.uint8)
+    if input_length / height < first_length / height:  # 输入图的人物占比要小，pose图需要缩小对齐,0.926 ratio
+        input_frames_cv2_first=cv2.resize(input_frames_cv2_first, (int(height * ratio), int(height * ratio)),
+                   interpolation=cv2.INTER_AREA)    #缩小
+        
+        reduced_image,pad_size=center_paste(base_image, input_frames_cv2_first) #中心粘贴
+    
+        move_ = -int(first_left_eye_y * ratio+pad_size[0] - input_left_eye_y) if first_left_eye_y * ratio +pad_size[0] >= \
+                                                                     input_left_eye_y else \
+             int(input_left_eye_y)- int(first_left_eye_y * ratio+pad_size[0]) #对齐眼睛
+        
+        translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]]) #y轴位移
+        shifted_image = cv2.warpAffine(reduced_image, translation_matrix, (width, height))
+    
+    else:  # pose图里人物的比例小于输入图，pose要放大
+        input_frames_cv2_first=cv2.resize(input_frames_cv2_first, (int(height / ratio), int(height / ratio)),
+                   interpolation=cv2.INTER_AREA) #放大
+        crpo_image=center_crop(input_frames_cv2_first, height, width) #中心裁切
+        
+        h, w = input_frames_cv2_first.shape[:2]
+        shift_y=(h-height)//2
+        
+        move_ = -int(first_left_eye_y / ratio-shift_y - input_left_eye_y) if first_left_eye_y / ratio-shift_y >= \
+                                                                     input_left_eye_y else \
+            int(input_left_eye_y) - int(first_left_eye_y / ratio-shift_y)
+        
+        translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]])
+        shifted_image = cv2.warpAffine(crpo_image, translation_matrix, (width, height))
+    return shifted_image
+
+def center_paste(img_b,img_f):
+    b_h,b_w=img_b.shape[:2]
+    f_h, f_w = img_f.shape[:2]
+    x = (b_w - f_w) // 2
+    y = (b_h - f_h) // 2
+    # 确保坐标不会是负数
+    x = max(0, x)
+    y = max(0, y)
+    img_b[y:y + f_h, x:x + f_w] = img_f
+    return img_b,(x,y)
+
+
+def affine_img(input_left_eye_y, first_left_eye_y, img):
+    height,width=img.shape[:2]
+    move_ = int(input_left_eye_y[0] - first_left_eye_y[0])
+    translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]])  # y轴位移
+    shifted_image = cv2.warpAffine(img, translation_matrix, (width, height))
+    return shifted_image
