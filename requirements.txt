@@ -1,6 +1,7 @@
 ffmpeg-python
 mediapipe
 moviepy
+ultralytics
 #moviepy==2.1.1
 IPython
 av
