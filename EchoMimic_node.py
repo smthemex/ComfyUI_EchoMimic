@@ -141,10 +141,8 @@ class Echo_LoadModel:
                                  pt_name="config.json")
                 vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device, dtype=weight_dtype)
             except:
-                try:
-                    vae = AutoencoderKL.from_pretrained(vae).to(device, dtype=weight_dtype)
-                except:
-                    raise "vae load error"
+                vae = AutoencoderKL.from_pretrained(vae).to(device, dtype=weight_dtype)
+                
         
         ## reference net init
         pretrained_base_model_path = get_instance_path(weigths_current_path)
@@ -306,10 +304,26 @@ class Echo_LoadModel:
                 dtype=weight_dtype)
             pose_state = torch.load(pose_encoder_pt)
             pose_net.load_state_dict(pose_state)
-            visualizer = None
             del pose_state
             gc.collect()
             torch.cuda.empty_cache()
+            if infer_mode == "pose_normal":
+                from .src.pose import SapiensPoseEstimation
+                pose_dir_32=os.path.join(weigths_current_path,"sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2")
+                pose_dir_bf16 = os.path.join(weigths_current_path, "sapiens_1b_goliath_best_goliath_AP_639_torchscript_bf16.pt2")
+                dtype=torch.float32
+                if os.path.exists(pose_dir_bf16):
+                    dtype=torch.float16
+                    pose_dir=pose_dir_bf16
+                else:
+                    if os.path.exists(pose_dir_32):
+                        pose_dir = pose_dir_32
+                    else:
+                        pose_dir = ""
+                visualizer = SapiensPoseEstimation(local_pose=pose_dir,model_dir=weigths_current_path,dtype=dtype)
+            else:
+                visualizer = None
+            
         
         ## load audio processor params
         audio_processor = load_audio_model(model_path=audio_pt, device=device)
@@ -320,7 +334,8 @@ class Echo_LoadModel:
             face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
                                   post_process=True, device=device)
         else:
-            face_detector=None
+            face_detector = None
+            
         ############# model_init finished #############
         if version == "V1":
             sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
@@ -395,7 +410,7 @@ class Echo_Sampler:
                 "seed": ("INT", {"default": 0, "min": 0, "max": MAX_SEED}),
                 "cfg": ("FLOAT", {"default": 2.5, "min": 0.0, "max": 10.0, "step": 0.1, "round": 0.01}),
                 "steps": ("INT", {"default": 30, "min": 1, "max": 100}),
-                "fps": ("INT", {"default": 25, "min": 5, "max": 100}),
+                "fps": ("FLOAT", {"default": 25.0, "min": 5.0, "max": 120.0}),
                 "sample_rate": ("INT", {"default": 16000, "min": 8000, "max": 48000, "step": 1000, }),
                 "facemask_ratio": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "facecrop_ratio": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
@@ -447,7 +462,7 @@ class Echo_Sampler:
         else:
             output_video=process_video_v2(image, audio_file, width, height, length, seed,
                              context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
-                             save_video, pose_dir, audio_file_prefix, )
+                             save_video, pose_dir, audio_file_prefix,visualizer,video_images )
             
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
