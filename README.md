@@ -4,6 +4,23 @@ You can using EchoMimic & EchoMimic V2 in comfyui
 [Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
 
+## Notice：
+
+**2024/12/05
+* 因为YOLO所需的ultralytics 库其特定的8.3.41Pypi版本被植入挖矿脚本，所以如果你因为使用V2版的视频驱动版本，最近通过pip安装了ultralytics，请务必按以下操作查看你的ultralytics版本：
+  1、comfyUI便携包，在python_embeded目录下，打开CMD，运行 python -m pip show ultralytics
+  2、comfyUI安装版，打开CMD 运行 pip show ultralytics
+  只要版本不是8.3.41，就无需理会，
+* 如果ultralytics的版本是8.3.41，请务必执行pip unistall ultralytics 并清除python的Lib\site-packages\ultralytics文件夹和带ultralytics名称的文件夹
+* 如果要继续使用8.3.41，可以使用pip install git+https://github.com/ultralytics/ultralytics.git 安装，当然我建议你使用其他版本。
+* Because the specific 8.3.41 Pypi version of the ‘ultralytics’ library required by YOLO is embedded with mining scripts, if you have recently installed ultralytics through pip while using the V2 ‘video’ driver version, please be sure to check your ultralytics version by following these steps:   
+  1. ComfyUI portable package, in the python_ embedded directory, open CMD and run： python -m pip show ultralytics  
+  2. ComfyUI installation version, open CMD and run : pip show ultralytics  
+As long as the version is not 8.3.41, there is no need to worry,  
+* If the version of ultralytics is 8.3.41, be sure to execute pip unisstall ultralytics and clear the ...Lib\site packages\ultralytics folder and folders with ultralytics names in Python   
+* If you want to continue using 8.3.41, you can use pip install git+ https://github.com/ultralytics/ultralytics.git Install, of course I suggest you use a different version.
+
+
 ---
 
 ## Updates:
