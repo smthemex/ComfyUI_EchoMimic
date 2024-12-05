@@ -102,6 +102,8 @@ class SapiensPoseEstimation:
 
         # Detect persons in the image
         bboxes = self.detector.detect(img)
+        if not bboxes:
+            return None,None,None
         
         GOLIATH_HAND_KEY = ["hand", "finger", "thumb", "wrist",]
         GOLIATH_FACE_NECK_KEY= ["nose", "eye", "neck","ear", "labiomental", "glabella", "chin", "lash","crease","nostril","mouth","lip","helix","tragus","iris","pupil","between_22_15","concha","crus"]
