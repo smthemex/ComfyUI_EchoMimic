@@ -7,10 +7,10 @@ You can using EchoMimic & EchoMimic V2 in comfyui
 ## Notice：
 
 **2024/12/05
-* 因为YOLO所需的ultralytics 库其特定的8.3.41Pypi版本被植入挖矿脚本，所以如果你因为使用V2版的视频驱动版本，最近通过pip安装了ultralytics，请务必按以下操作查看你的ultralytics版本：
-  1、comfyUI便携包，在python_embeded目录下，打开CMD，运行 python -m pip show ultralytics
-  2、comfyUI安装版，打开CMD 运行 pip show ultralytics
-  只要版本不是8.3.41，就无需理会，
+* 因为YOLO所需的ultralytics 库其特定的8.3.41Pypi版本被植入挖矿脚本，所以如果你因为使用V2版的视频驱动版本，最近通过pip安装了ultralytics，请务必按以下操作查看你的ultralytics版本 ：  
+  1、comfyUI便携包，在python_embeded目录下，打开CMD，运行 python -m pip show ultralytics   
+  2、comfyUI安装版，打开CMD 运行 pip show ultralytics   
+  只要版本不是8.3.41，就无需理会，   
 * 如果ultralytics的版本是8.3.41，请务必执行pip unistall ultralytics 并清除python的Lib\site-packages\ultralytics文件夹和带ultralytics名称的文件夹
 * 如果要继续使用8.3.41，可以使用pip install git+https://github.com/ultralytics/ultralytics.git 安装，当然我建议你使用其他版本。
 * Because the specific 8.3.41 Pypi version of the ‘ultralytics’ library required by YOLO is embedded with mining scripts, if you have recently installed ultralytics through pip while using the V2 ‘video’ driver version, please be sure to check your ultralytics version by following these steps:   
