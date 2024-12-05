@@ -63,6 +63,13 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         
         # 首帧手势对齐输入图片，keypoint数据左眼，肩膀及手肘，
         _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[0]),None)
+        if first_key is None and first_box_xy is None: # first frame maybe empty or no preson,skip it,try find sceond
+            logging.info("first frame don't has person,skip it")
+            for i in range(len(input_frames_cv2)):
+                _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[i+1]), None)
+                if first_key is not None and first_box_xy is not None:
+                    break
+            
         _, input_key, input_box_xy = visualizer(np.asarray(panding_img),None)
         first_length,first_left_eye_y=estimate_ratio(first_key,first_box_xy)
         input_length,input_left_eye_y = estimate_ratio(input_key,input_box_xy)
@@ -82,17 +89,45 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                     0] / height) > 0.005:
                     input_frames_cv2 = [affine_img(input_left_eye_y, first_left_eye_y, i) for i in input_frames_cv2]
         
-        xxx=input_frames_cv2
-        for i,xx in enumerate(xxx):
-            cv2.imwrite(f"{i}.png",xx)
-            if i >2:
-                break
+        # xxx=input_frames_cv2
+        # for i,xx in enumerate(xxx):
+        #     cv2.imwrite(f"{i}.png",xx)
+        #     if i >2:
+        #         break
         
         index = 0
+        empty_index=[]
         for i in tqdm(input_frames_cv2):
             pose_img,_,_=visualizer(np.asarray(i),[5])
+            if pose_img is None:
+                pose_img=np.zeros((width, height, 3), np.uint8) #防止空帧报错
+                empty_index.append(i) # 记录空帧索引
             np.save(os.path.join(pose_dir, f"{index}"), pose_img)
             index+=1
+        
+        if empty_index:
+           
+            if len(empty_index) == 1:
+                if empty_index[0] != 0:
+                    np.save(os.path.join(pose_dir, f"{empty_index[0]}"), input_frames_cv2[empty_index[0] - 1])  # 抽前帧覆盖
+                else:
+                    np.save(os.path.join(pose_dir, f"{empty_index[0]}"),
+                            input_frames_cv2[empty_index[0] + 1])  # 抽第一帧帧覆盖
+            else:
+                if 0 not in empty_index:
+                    for i in empty_index:
+                        np.save(os.path.join(pose_dir, f"{i}"), input_frames_cv2[i - 1])  # 抽前帧覆盖
+                else:
+                    for i,x in enumerate(empty_index): #先抽非连续帧的前帧覆盖0帧
+                        if  empty_index[i] != x:  # [0,1,x]
+                            np.save(os.path.join(pose_dir, f"{empty_index[0]}"), input_frames_cv2[x - 1])  #
+                            break
+                    for i in empty_index: #其他帧抽前帧覆盖
+                        if i != 0:
+                            np.save(os.path.join(pose_dir, f"{i}"),
+                                    input_frames_cv2[i - 1])
+                    
+                       
         USE_Default = False
         visualizer.enable_model_cpu_offload()
         gc.collect()
