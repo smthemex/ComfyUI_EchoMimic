@@ -102,7 +102,7 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                 pose_img=np.zeros((width, height, 3), np.uint8) #防止空帧报错
                 empty_index.append(i) # 记录空帧索引
             np.save(os.path.join(pose_dir, f"{i}"), pose_img)
-            cv2.imwrite(f"{i}.png", pose_img)
+            #cv2.imwrite(f"{i}.png", pose_img)
         
         if empty_index:
             print(f"********* The index of frames list : {empty_index} , which is no person find in images *********")
