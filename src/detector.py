@@ -21,11 +21,15 @@ class Detector:
     def detect(self, img: np.ndarray) -> np.ndarray:
 
         results = self.model(img, conf=self.conf_thres)
+        
         detections = results[0].boxes.data.cpu().numpy()  # (x1, y1, x2, y2, conf, cls)
-
-        # Filter out only person
-        person_detections = detections[detections[:, -1] == self.person_id]
-        boxes = person_detections[:, :-2].astype(int)
+        if detections is not []:
+            
+            # Filter out only person
+            person_detections = detections[detections[:, -1] == self.person_id]
+            boxes = person_detections[:, :-2].astype(int)
+        else:
+            boxes=[]
 
         return boxes
 
