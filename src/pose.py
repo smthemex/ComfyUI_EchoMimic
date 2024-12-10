@@ -97,33 +97,35 @@ class SapiensPoseEstimation:
         # Initialize the YOLO-based detector
         self.detector = Detector()
 
-    def __call__(self, img: np.ndarray,filter_obj) -> (np.ndarray,):
-        start = time.perf_counter()
+    def __call__(self, img: np.ndarray,filter_obj):
+        #start = time.perf_counter()
 
         # Detect persons in the image
         bboxes = self.detector.detect(img)
-        if not bboxes:
-            return None,None,None
         
-        GOLIATH_HAND_KEY = ["hand", "finger", "thumb", "wrist",]
-        GOLIATH_FACE_NECK_KEY= ["nose", "eye", "neck","ear", "labiomental", "glabella", "chin", "lash","crease","nostril","mouth","lip","helix","tragus","iris","pupil","between_22_15","concha","crus"]
-        GOLIATH_LOWER_LIMBS_KEY= ["hip", "knee", "ankle", "toe", "heel"]
-        GOLIATH_TORSO_KEY= ["hip", "shoulder"]
+        GOLIATH_HAND_KEY = ["hand", "finger", "thumb", "wrist", ]
+        GOLIATH_FACE_NECK_KEY = ["nose", "eye", "neck", "ear", "labiomental", "glabella", "chin", "lash", "crease",
+                                 "nostril", "mouth", "lip", "helix", "tragus", "iris", "pupil", "between_22_15",
+                                 "concha", "crus"]
+        GOLIATH_LOWER_LIMBS_KEY = ["hip", "knee", "ankle", "toe", "heel"]
+        GOLIATH_TORSO_KEY = ["hip", "shoulder"]
         GOLIATH_ELBOW_HAND_KEY = ["hand", "finger", "thumb", "elbow", "wrist", "olecranon", "cubital_fossa"]
-        filter_obj_list= {"Face_Neck":GOLIATH_FACE_NECK_KEY,"Left_Hand":GOLIATH_HAND_KEY,"Left_Foot":GOLIATH_LOWER_LIMBS_KEY,"Torso":GOLIATH_TORSO_KEY,"Left_Lower_Arm":GOLIATH_ELBOW_HAND_KEY}
-        filter_obj_done=[]
+        filter_obj_list = {"Face_Neck": GOLIATH_FACE_NECK_KEY, "Left_Hand": GOLIATH_HAND_KEY,
+                           "Left_Foot": GOLIATH_LOWER_LIMBS_KEY, "Torso": GOLIATH_TORSO_KEY,
+                           "Left_Lower_Arm": GOLIATH_ELBOW_HAND_KEY}
+        filter_obj_done = []
         if filter_obj:
             select_str_list = [list(GOLIATH_CLASSES_FIX)[i].split(".")[-1] for i in filter_obj]
-            if all(any(x in y for y in select_str_list) for x in list(filter_obj_list.keys()) ):
-                filter_obj_done=[]
+            if all(any(x in y for y in select_str_list) for x in list(filter_obj_list.keys())):
+                filter_obj_done = []
             else:
                 for i in select_str_list:
                     if filter_obj_list.get(i):
                         filter_obj_done.append(filter_obj_list.get(i))
-
             
             # Process the image and estimate the pose
-        pose_result_image, keypoints,box_size = self.estimate_pose(img, bboxes,filter_obj_done)
+        pose_result_image, keypoints, box_size = self.estimate_pose(img, bboxes, filter_obj_done)
+       
 
         #print(f"Pose estimation inference took: {time.perf_counter() - start:.4f} seconds")
         return pose_result_image, keypoints,box_size
@@ -139,7 +141,7 @@ class SapiensPoseEstimation:
     def estimate_pose(self, img: np.ndarray, bboxes: List[List[float]],filter_obj_done) -> (np.ndarray, List[dict],tuple):
         all_keypoints = []
         result_img = img.copy()
-
+        box_size=[]
         for bbox in bboxes:
             cropped_img = self.crop_image(img, bbox)
             tensor = self.preprocessor(cropped_img).unsqueeze(0).to(self.device).to(self.dtype)
@@ -195,7 +197,9 @@ class SapiensPoseEstimation:
         bbox_width, bbox_height = x2 - x1, y2 - y1
        
         img_copy = img.copy()
-        box_size=(bbox_width, bbox_height)
+        if bbox is []:
+            box_xy=None
+        #box_size=(bbox_width, bbox_height)
         # Draw keypoints on t1Bhe image
         for i, (name, (x, y, conf)) in enumerate(keypoints.items()):
             if conf > 0.3:  # Only draw confident keypoints
