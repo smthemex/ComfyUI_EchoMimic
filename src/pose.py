@@ -57,7 +57,7 @@ class SapiensPoseEstimationType(Enum):
     POSE_ESTIMATION_1B = "sapiens_1b_goliath_best_goliath_AP_639.pth"
     POSE_ESTIMATION_03B_T = "sapiens_0.3b_goliath_best_goliath_AP_575_torchscript.pt2"
     POSE_ESTIMATION_06B_T = "sapiens_0.6b_goliath_best_goliath_AP_609_torchscript.pt2"
-    POSE_ESTIMATION_1B_T = "sapiens_1b_goliath_best_goliath_AP_640_torchscript.pt2"
+    POSE_ESTIMATION_1B_T = "sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2"
     POSE_ESTIMATION_03B_16 = "sapiens_0.3b_goliath_best_goliath_AP_573_bfloat16.pt2"
     POSE_ESTIMATION_06B_16 = "sapiens_0.6b_goliath_best_goliath_AP_609_bfloat16.pt2"
     POSE_ESTIMATION_1B_16 = "sapiens_1b_goliath_best_goliath_AP_639_bfloat16.pt2"
