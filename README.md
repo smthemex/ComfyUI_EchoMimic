@@ -1,5 +1,5 @@
 # ComfyUI_EchoMimic
-You can using EchoMimic & EchoMimic V2 in comfyui
+You can use EchoMimic & EchoMimic V2 in comfyui
 
 [Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
