@@ -112,7 +112,7 @@ class Echo_LoadModel:
             "required": {
                 "vae": ("STRING", {"default": "stabilityai/sd-vae-ft-mse"}),
                 "denoising": ("BOOLEAN", {"default": True},),
-                "infer_mode": (["audio_drived", "audio_drived_acc", "pose_normal", "pose_acc"],),
+                "infer_mode": (["audio_drived", "audio_drived_acc", "pose_normal_dwpose","pose_normal_sapiens", "pose_acc"],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync": ("BOOLEAN", {"default": False},),
                 "lowvram": ("BOOLEAN", {"default": False},),
@@ -307,20 +307,32 @@ class Echo_LoadModel:
             del pose_state
             gc.collect()
             torch.cuda.empty_cache()
-            if infer_mode == "pose_normal":
+            if infer_mode == "pose_normal_dwpose":
+                print("using DWpose drive pose")
+                from .echomimic_v2.src.models.dwpose.dwpose_detector import DWposeDetector
+                dw_ll=download_weights(weigths_current_path, "yzd-v/DWPose", subfolder="",
+                                 pt_name="dw-ll_ucoco_384.onnx")
+                yolox_l = download_weights(weigths_current_path, "yzd-v/DWPose", subfolder="",
+                                         pt_name="yolox_l.onnx")
+                visualizer = DWposeDetector(model_det=yolox_l,model_pose=dw_ll,device=device)
+                
+            elif infer_mode == "pose_normal_sapiens":
+                print("using Sapiens drive pose")
                 from .src.pose import SapiensPoseEstimation
-                pose_dir_32=os.path.join(weigths_current_path,"sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2")
-                pose_dir_bf16 = os.path.join(weigths_current_path, "sapiens_1b_goliath_best_goliath_AP_639_torchscript_bf16.pt2")
-                dtype=torch.float32
+                pose_dir_32 = os.path.join(weigths_current_path,
+                                           "sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2")
+                pose_dir_bf16 = os.path.join(weigths_current_path,
+                                             "sapiens_1b_goliath_best_goliath_AP_639_torchscript_bf16.pt2")
+                dtype = torch.float32
                 if os.path.exists(pose_dir_bf16):
-                    dtype=torch.float16
-                    pose_dir=pose_dir_bf16
+                    dtype = torch.float16
+                    pose_dir = pose_dir_bf16
                 else:
                     if os.path.exists(pose_dir_32):
                         pose_dir = pose_dir_32
                     else:
                         pose_dir = ""
-                visualizer = SapiensPoseEstimation(local_pose=pose_dir,model_dir=weigths_current_path,dtype=dtype)
+                visualizer = SapiensPoseEstimation(local_pose=pose_dir, model_dir=weigths_current_path, dtype=dtype)
             else:
                 visualizer = None
             
@@ -334,7 +346,12 @@ class Echo_LoadModel:
             face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
                                   post_process=True, device=device)
         else:
-            face_detector = None
+            if infer_mode == "pose_normal_dwpose":
+                face_detector ="dwpose"
+            elif infer_mode == "pose_normal_sapiens":
+                face_detector = "sapiens"
+            else:
+                face_detector = None
             
         ############# model_init finished #############
         if version == "V1":
@@ -399,7 +416,7 @@ class Echo_LoadModel:
 class Echo_Sampler:
     @classmethod
     def INPUT_TYPES(s):
-        pose_path_list = ["none"] + find_directories(tensorrt_lite) if find_directories(tensorrt_lite) else ["none", ]
+        pose_path_list = ["pose_01","pose_02","pose_03","pose_04","pose_fight","pose_good","pose_salute","pose_ultraman"] + find_directories(tensorrt_lite) if find_directories(tensorrt_lite) else ["pose_01","pose_02","pose_03","pose_04","pose_fight","pose_good","pose_salute","pose_ultraman"]
         return {
             "required": {
                 "image": ("IMAGE",),  # [B,H,W,C], C=3
@@ -462,7 +479,7 @@ class Echo_Sampler:
         else:
             output_video=process_video_v2(image, audio_file, width, height, length, seed,
                              context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
-                             save_video, pose_dir, audio_file_prefix,visualizer,video_images )
+                             save_video, pose_dir, audio_file_prefix,visualizer,video_images,face_detector )
             
         gen = narry_list(output_video)  # pil列表排序
         images = torch.from_numpy(np.fromiter(gen, np.dtype((np.float32, (height, width, 3)))))
