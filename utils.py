@@ -10,6 +10,7 @@ import cv2
 import sys
 import pickle
 import gc
+import shutil
 from huggingface_hub import hf_hub_download
 try:
     from moviepy.editor import  VideoFileClip, AudioFileClip
@@ -25,16 +26,16 @@ from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangl
 from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
-import shutil
+from multiprocessing.pool import ThreadPool
 weight_dtype = torch.float16
 cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 tensorrt_lite= os.path.join(folder_paths.get_input_directory(),"tensorrt_lite")
-
+MAX_SIZE = 768
 
 def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
                    context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,
-                  save_video, pose_dir, audio_file_prefix,visualizer,video_images):
+                  save_video, pose_dir, audio_file_prefix,visualizer,video_images,face_detector):
     origin_h = height
     origin_w = width
     # 处理输入图片的尺寸
@@ -51,7 +52,10 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
             raise "input video has not much frames for driver,change your input video!"
         else:
             tensor_list = list(torch.chunk(video_images, chunks=video_len))
-            input_frames_cv2 = [img_padding(height,width,i) for i in tensor_list]
+            input_frames_cv2 = [img_padding(height,width,i) for i in tensor_list] #不管输出图片是何种尺寸，为保证图片质量，将输入视频转为为正方形，横裁切，竖填充，长宽为输出尺寸最大
+            
+        if face_detector=="sapiens":
+            audio_file_prefix=f"{audio_file_prefix}_sapiens"
         pose_dir = os.path.join(tensorrt_lite, audio_file_prefix)
         if not os.path.exists(pose_dir):
             os.makedirs(pose_dir)
@@ -59,94 +63,103 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
             timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             pose_dir = os.path.join(tensorrt_lite, f"{audio_file_prefix}_{timestamp}")
             os.makedirs(pose_dir)
-        visualizer.move_to_cuda()
         
-        # 首帧手势对齐输入图片，keypoint数据左眼，肩膀及手肘，
-        _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[0]),None)
-        if not first_box_xy : # first frame maybe empty or no preson,skip it,try find sceond
-            logging.info("*********first frame don't has person,skip it**********")
-            for i in range(len(input_frames_cv2)):
-                _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[i+1]), None)
-                if  first_box_xy:
-                    break
+        #convert_fps(ori_video_path, ori_video_path_new)
+        # extract pose
+        if face_detector=="dwpose":
+            detected_poses, height_video, width_video, ori_frames = get_video_pose(visualizer, input_frames_cv2,
+                                                                                   max_frame=None)
+            # parameterize pose
+            res_params = get_pose_params(detected_poses, MAX_SIZE)
+            # save pose to npy
+            pose_dir = save_pose_params(detected_poses, res_params['pose_params'],
+                                        res_params['draw_pose_params'], pose_dir)
+            USE_Default=True
+            print(f"All Finished,video frames number is {len(input_frames_cv2)}")
+        else:
+            # 首帧手势对齐输入图片，keypoint数据左眼，肩膀及手肘，
+            _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[0]), None)
+            if not first_box_xy:  # first frame maybe empty or no preson,skip it,try find sceond
+                logging.info("*********first frame don't has person,skip it**********")
+                for i in range(len(input_frames_cv2)):
+                    _, first_key, first_box_xy = visualizer(np.asarray(input_frames_cv2[i + 1]), None)
+                    if first_box_xy:
+                        break
             
-        _, input_key, input_box_xy = visualizer(np.asarray(panding_img),None)
-        first_length,first_left_eye_y=estimate_ratio(first_key,first_box_xy)
-        input_length,input_left_eye_y = estimate_ratio(input_key,input_box_xy)
-        #print(first_length,first_left_eye_y,input_length,input_left_eye_y) #160.0 [236.0] 158.0 [151.0] 眼睛高度为绝对值
-        if first_length and first_left_eye_y and input_length and input_left_eye_y:
-            if abs(input_length / height - first_length / height) > 0.005:  # 比例不同须基于输入图片对齐
-                logging.info(
-                    "Starting the first frame gesture alignment based on the input image *** 基于输入图片，开始首帧手势缩放对齐 !")
-                input_left_eye_y_=input_left_eye_y[0]
-                first_left_eye_y_=first_left_eye_y[0]
-                input_frames_cv2=[align_img(input_length, first_length, height, width, i, input_left_eye_y_,
-                          first_left_eye_y_) for i in input_frames_cv2]
-            else:# 人体比例接近，但是高度不对，也需要对齐
-                logging.info(
-                    "Starting the first frame shift based on the input image *** 基于输入图片，开始首帧手势平移对齐 !")
-                if abs(input_left_eye_y[0] / height - first_left_eye_y[
-                    0] / height) > 0.005:
-                    input_frames_cv2 = [affine_img(input_left_eye_y, first_left_eye_y, i) for i in input_frames_cv2]
-        
-        # xxx=input_frames_cv2
-        # for i,xx in enumerate(xxx):
-        #     cv2.imwrite(f"{i}.png",xx)
-        #     if i >2:
-        #         break
-        
-        empty_index=[]
-        for i,img in enumerate(input_frames_cv2):
-            pose_img,_,BOX_=visualizer(np.asarray(img),[5])
-            if not BOX_:
-                pose_img=np.zeros((width, height, 3), np.uint8) #防止空帧报错
-                empty_index.append(i) # 记录空帧索引
-            np.save(os.path.join(pose_dir, f"{i}"), pose_img)
-            #cv2.imwrite(f"{i}.png", pose_img)
-        
-        if empty_index:
-            print(f"********* The index of frames list : {empty_index} , which is no person find in images *********")
+            _, input_key, input_box_xy = visualizer(np.asarray(panding_img), None)
+            first_length, first_left_eye_y = estimate_ratio(first_key, first_box_xy)
+            input_length, input_left_eye_y = estimate_ratio(input_key, input_box_xy)
+            # print(first_length,first_left_eye_y,input_length,input_left_eye_y) #160.0 [236.0] 158.0 [151.0] 眼睛高度为绝对值
+            if first_length and first_left_eye_y and input_length and input_left_eye_y:
+                if abs(input_length / height - first_length / height) > 0.005:  # 比例不同须基于输入图片对齐
+                    logging.info(
+                        "Starting the first frame gesture alignment based on the input image *** 基于输入图片，开始首帧手势缩放对齐 !")
+                    input_left_eye_y_ = input_left_eye_y[0]
+                    first_left_eye_y_ = first_left_eye_y[0]
+                    input_frames_cv2 = [align_img(input_length, first_length, height, width, i, input_left_eye_y_,
+                                                  first_left_eye_y_) for i in input_frames_cv2]
+                else:  # 人体比例接近，但是高度不对，也需要对齐
+                    logging.info(
+                        "Starting the first frame shift based on the input image *** 基于输入图片，开始首帧手势平移对齐 !")
+                    if abs(input_left_eye_y[0] / height - first_left_eye_y[
+                        0] / height) > 0.005:
+                        input_frames_cv2 = [affine_img(input_left_eye_y, first_left_eye_y, i) for i in input_frames_cv2]
+            empty_index = []
+            for i, img in enumerate(input_frames_cv2):
+                pose_img, _, BOX_ = visualizer(np.asarray(img), [5])
+                if not BOX_:
+                    pose_img = np.zeros((width, height, 3), np.uint8)  # 防止空帧报错
+                    empty_index.append(i)  # 记录空帧索引
+                np.save(os.path.join(pose_dir, f"{i}"), pose_img)
+                # cv2.imwrite(f"{i}.png", pose_img)
             
-            if len(empty_index) == 1:
-                if empty_index[0] != 0:
-                    shutil.copy2(os.path.join(pose_dir, f"{empty_index[0]}.npy"), os.path.join(pose_dir, f"{empty_index[0]-1}.npy")) # 抽前帧覆盖
+            if empty_index:
+                print(
+                    f"********* The index of frames list : {empty_index} , which is no person find in images *********")
+                
+                if len(empty_index) == 1:
+                    if empty_index[0] != 0:
+                        shutil.copy2(os.path.join(pose_dir, f"{empty_index[0]}.npy"),
+                                     os.path.join(pose_dir, f"{empty_index[0] - 1}.npy"))  # 抽前帧覆盖
+                    else:
+                        shutil.copy2(os.path.join(pose_dir, f"{empty_index[0]}.npy"),
+                                     os.path.join(pose_dir, f"{empty_index[0] + 1}.npy"))  # 抽前帧覆盖
                 else:
-                    shutil.copy2(os.path.join(pose_dir, f"{empty_index[0]}.npy"),
-                                 os.path.join(pose_dir, f"{empty_index[0] + 1}.npy"))  # 抽前帧覆盖
-            else:
-                if 0 not in empty_index:
-                    for i in empty_index:
-                        shutil.copy2(os.path.join(pose_dir, f"{i}.npy"),
-                                     os.path.join(pose_dir, f"{empty_index[i] - 1}.npy"))  # 抽前帧覆盖
-                        
-                else:
-                    for i,x in enumerate(empty_index): #先抽连续帧最末尾的后一帧盖0帧
-                        if  empty_index[i] != x:  # [0,1,x]
-                            shutil.copy2(os.path.join(pose_dir, f"{0}.npy"),
-                                         os.path.join(pose_dir, f"{i}.npy"))
-                            break
-                        else:
-                            pass
-                       
-                    for i,x in enumerate(empty_index): #其他帧抽前帧覆盖
-                        if i!=0:
-                            shutil.copy2(os.path.join(pose_dir, f"{x}.npy"),
+                    if 0 not in empty_index:
+                        for i in empty_index:
+                            shutil.copy2(os.path.join(pose_dir, f"{i}.npy"),
                                          os.path.join(pose_dir, f"{empty_index[i] - 1}.npy"))  # 抽前帧覆盖
-                       
-        USE_Default = False
-        visualizer.enable_model_cpu_offload()
-        gc.collect()
-        torch.cuda.empty_cache()
+                    
+                    else:
+                        for i, x in enumerate(empty_index):  # 先抽连续帧最末尾的后一帧盖0帧
+                            if empty_index[i] != x:  # [0,1,x]
+                                shutil.copy2(os.path.join(pose_dir, f"{0}.npy"),
+                                             os.path.join(pose_dir, f"{i}.npy"))
+                                break
+                            else:
+                                pass
+                        
+                        for i, x in enumerate(empty_index):  # 其他帧抽前帧覆盖
+                            if i != 0:
+                                shutil.copy2(os.path.join(pose_dir, f"{x}.npy"),
+                                             os.path.join(pose_dir, f"{empty_index[i] - 1}.npy"))  # 抽前帧覆盖
+            
+            USE_Default = False
+            visualizer.enable_model_cpu_offload()
+            gc.collect()
+            torch.cuda.empty_cache()
     else:
-        if pose_dir == "none":
-            logging.info("when use echo v2,need choice a pose dir,using default pose for testing !")
-            pose_dir = os.path.join(cur_path, "echomimic_v2/assets/halfbody_demo/pose/01")
-            USE_Default = True
+        if pose_dir in ["pose_01","pose_02","pose_03","pose_04","pose_fight","pose_good","pose_salute","pose_ultraman"]:
+            pose_d=pose_dir.split("_")[-1]
+            logging.info(f"use default pose {pose_dir} for running !")
+            pose_dir = os.path.join(cur_path, f"echomimic_v2/assets/halfbody_demo/pose/{pose_d}")
+            USE_Default = False
         else:
             logging.info(
-                "Use NPY files for custom videos, which must be located in directory comfyui/input/tensorrt_lite")
+                "Use NPY files for custom videos, which must be located in directory 'comfyui/input/tensorrt_lite'")
             pose_dir = os.path.join(tensorrt_lite, pose_dir)
-            USE_Default = False
+            USE_Default=True if "sapiens" in pose_dir else False
+            
         
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
@@ -166,14 +179,15 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         tgt_musk_path = os.path.join(pose_dir, "{}.npy".format(index))
         if USE_Default:
             detected_pose = np.load(tgt_musk_path, allow_pickle=True).tolist()
-            imh_new, imw_new, rb, re, cb, ce = detected_pose['draw_pose_params']  #print(imh_new, imw_new, rb, re, cb, ce) 官方示例蒙版的尺寸是768*768
-            im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800) #缩放比例为1，im也是768 ref_w！=768
+            imh_new, imw_new, rb, re, cb, ce = detected_pose[
+                'draw_pose_params']  # print(imh_new, imw_new, rb, re, cb, ce) 官方示例蒙版的尺寸是768*768
+            im = draw_pose_select_v2(detected_pose, imh_new, imw_new, ref_w=800)  # 缩放比例为1，im也是768 ref_w！=768
             im = np.transpose(np.array(im), (1, 2, 0))
             tgt_musk = np.zeros((imw_new, imh_new, 3)).astype('uint8')
             tgt_musk[rb:re, cb:ce, :] = im
         else:
             tgt_musk = np.load(tgt_musk_path, allow_pickle=True)
-       
+
         tgt_musk = center_resize_pad(tgt_musk, width, height) # 缩放裁剪遮罩，防止遮罩非正方形
         tgt_musk_pil = Image.fromarray(np.array(tgt_musk)).convert('RGB')
         
@@ -763,3 +777,251 @@ def affine_img(input_left_eye_y, first_left_eye_y, img):
     translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]])  # y轴位移
     shifted_image = cv2.warpAffine(img, translation_matrix, (width, height))
     return shifted_image
+
+
+def convert_fps(src_path, tgt_path, tgt_fps=24, tgt_sr=16000):
+    clip = VideoFileClip(src_path)
+    new_clip = clip.set_fps(tgt_fps)
+    if tgt_fps is not None:
+        audio = new_clip.audio
+        audio = audio.set_fps(tgt_sr)
+        new_clip = new_clip.set_audio(audio)
+    if '.mov' in tgt_path:
+        tgt_path = tgt_path.replace('.mov', '.mp4')
+    new_clip.write_videofile(tgt_path, codec='libx264', audio_codec='aac')
+
+
+def get_video_pose(visualizer,
+        frames,
+        sample_stride: int = 1,
+        max_frame=None):
+    # read input video
+    #vr = decord.VideoReader(video_path, ctx=decord.cpu(0))
+    #sample_stride *= max(1, int(vr.get_avg_fps() / 24))
+    
+    #frames = vr.get_batch(list(range(0, len(vr), sample_stride))).asnumpy()
+    #frames=vr.get_batch(list(range(0, len(vr), sample_stride))).asnumpy()
+    # print(frames[0])
+    if max_frame is not None:
+        frames = frames[:max_frame]
+    height, width, _ = frames[0].shape
+    print("start get video pose list")
+    detected_poses = [visualizer(frm) for frm in frames]
+    visualizer.release_memory()
+    
+    return detected_poses, height, width, frames
+
+
+def resize_and_pad(img, max_size):
+    img_new = np.zeros((max_size, max_size, 3)).astype('uint8')
+    imh, imw = img.shape[0], img.shape[1]
+    half = max_size // 2
+    if imh > imw:
+        imh_new = max_size
+        imw_new = int(round(imw / imh * imh_new))
+        half_w = imw_new // 2
+        rb, re = 0, max_size
+        cb = half - half_w
+        ce = cb + imw_new
+    else:
+        imw_new = max_size
+        imh_new = int(round(imh / imw * imw_new))
+        half_h = imh_new // 2
+        cb, ce = 0, max_size
+        rb = half - half_h
+        re = rb + imh_new
+    
+    img_resize = cv2.resize(img, (imw_new, imh_new))
+    img_new[rb:re, cb:ce, :] = img_resize
+    return img_new
+
+
+def resize_and_pad_param(imh, imw, max_size):
+    half = max_size // 2
+    if imh > imw:
+        imh_new = max_size
+        imw_new = int(round(imw / imh * imh_new))
+        half_w = imw_new // 2
+        rb, re = 0, max_size
+        cb = half - half_w
+        ce = cb + imw_new
+    else:
+        imw_new = max_size
+        imh_new = int(round(imh / imw * imw_new))
+        imh_new = max_size
+        
+        half_h = imh_new // 2
+        cb, ce = 0, max_size
+        rb = half - half_h
+        re = rb + imh_new
+    
+    return imh_new, imw_new, rb, re, cb, ce
+
+
+def get_pose_params(detected_poses, max_size):
+    
+    print('get_pose_params...')
+    # pose rescale
+    height = 768
+    width=768
+    
+    w_min_all, w_max_all, h_min_all, h_max_all = [], [], [], []
+    mid_all = []
+    for num, detected_pose in enumerate(detected_poses):
+        detected_poses[num]['num'] = num
+        candidate_body = detected_pose['bodies']['candidate']
+        score_body = detected_pose['bodies']['score']
+        candidate_face = detected_pose['faces']
+        score_face = detected_pose['faces_score']
+        candidate_hand = detected_pose['hands']
+        score_hand = detected_pose['hands_score']
+        
+        # face
+        if candidate_face.shape[0] > 1:
+            index = 0
+            candidate_face = candidate_face[index]
+            score_face = score_face[index]
+            detected_poses[num]['faces'] = candidate_face.reshape(1, candidate_face.shape[0], candidate_face.shape[1])
+            detected_poses[num]['faces_score'] = score_face.reshape(1, score_face.shape[0])
+        else:
+            candidate_face = candidate_face[0]
+            score_face = score_face[0]
+        
+        # body
+        if score_body.shape[0] > 1:
+            tmp_score = []
+            for k in range(0, score_body.shape[0]):
+                tmp_score.append(score_body[k].mean())
+            index = np.argmax(tmp_score)
+            candidate_body = candidate_body[index * 18:(index + 1) * 18, :]
+            score_body = score_body[index]
+            score_hand = score_hand[(index * 2):(index * 2 + 2), :]
+            candidate_hand = candidate_hand[(index * 2):(index * 2 + 2), :, :]
+        else:
+            score_body = score_body[0]
+        all_pose = np.concatenate((candidate_body, candidate_face))
+        all_score = np.concatenate((score_body, score_face))
+        all_pose = all_pose[all_score > 0.8]
+        
+        body_pose = np.concatenate((candidate_body,))
+        mid_ = body_pose[1, 0]
+        
+        face_pose = candidate_face
+        hand_pose = candidate_hand
+        
+        h_min, h_max = np.min(face_pose[:, 1]), np.max(body_pose[:7, 1])
+        
+        h_ = h_max - h_min
+        
+        mid_w = mid_
+        w_min = mid_w - h_ // 2
+        w_max = mid_w + h_ // 2
+        
+        w_min_all.append(w_min)
+        w_max_all.append(w_max)
+        h_min_all.append(h_min)
+        h_max_all.append(h_max)
+        mid_all.append(mid_w)
+    
+    w_min = np.min(w_min_all)
+    w_max = np.max(w_max_all)
+    h_min = np.min(h_min_all)
+    h_max = np.max(h_max_all)
+    mid = np.mean(mid_all)
+    
+    margin_ratio = 0.25
+    h_margin = (h_max - h_min) * margin_ratio
+    
+    h_min = max(h_min - h_margin * 0.8, 0)
+    h_max = min(h_max + h_margin * 0.1, 1)
+    
+    h_new = h_max - h_min
+    
+    h_min_real = int(h_min * height)
+    h_max_real = int(h_max * height)
+    mid_real = int(mid * width)
+    
+    height_new = h_max_real - h_min_real + 1
+    width_new = height_new
+    w_min_real = mid_real - width_new // 2
+    if w_min_real < 0:
+        w_min_real = 0
+        width_new = mid_real * 2
+    
+    w_max_real = w_min_real + width_new
+    w_min = w_min_real / width
+    w_max = w_max_real / width
+    
+    imh_new, imw_new, rb, re, cb, ce = resize_and_pad_param(height_new, width_new, max_size)
+    res = {'draw_pose_params': [imh_new, imw_new, rb, re, cb, ce],
+           'pose_params': [w_min, w_max, h_min, h_max],
+           'video_params': [h_min_real, h_max_real, w_min_real, w_max_real],
+           }
+    return res
+
+
+def save_pose_params_item(input_items):
+    detected_pose, pose_params, draw_pose_params, save_dir = input_items
+    w_min, w_max, h_min, h_max = pose_params
+    num = detected_pose['num']
+    candidate_body = detected_pose['bodies']['candidate']
+    candidate_face = detected_pose['faces'][0]
+    candidate_hand = detected_pose['hands']
+    candidate_body[:, 0] = (candidate_body[:, 0] - w_min) / (w_max - w_min)
+    candidate_body[:, 1] = (candidate_body[:, 1] - h_min) / (h_max - h_min)
+    candidate_face[:, 0] = (candidate_face[:, 0] - w_min) / (w_max - w_min)
+    candidate_face[:, 1] = (candidate_face[:, 1] - h_min) / (h_max - h_min)
+    candidate_hand[:, :, 0] = (candidate_hand[:, :, 0] - w_min) / (w_max - w_min)
+    candidate_hand[:, :, 1] = (candidate_hand[:, :, 1] - h_min) / (h_max - h_min)
+    detected_pose['bodies']['candidate'] = candidate_body
+    detected_pose['faces'] = candidate_face.reshape(1, candidate_face.shape[0], candidate_face.shape[1])
+    detected_pose['hands'] = candidate_hand
+    detected_pose['draw_pose_params'] = draw_pose_params
+    np.save(save_dir + '/' + str(num) + '.npy', detected_pose)
+
+
+def save_pose_params(detected_poses, pose_params, draw_pose_params, save_dir):
+    #save_dir = ori_video_path.replace('video', 'pose/')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    input_list = []
+    
+    for i, detected_pose in enumerate(detected_poses):
+        input_list.append([detected_pose, pose_params, draw_pose_params, save_dir])
+    
+    pool = ThreadPool(8)
+    pool.map(save_pose_params_item, input_list)
+    pool.close()
+    pool.join()
+    return save_dir
+
+
+def get_img_pose(visualizer,
+        img_path: str,
+        sample_stride: int = 1,
+        max_frame=None):
+    # read input img
+    frame = cv2.imread(img_path)
+    height, width, _ = frame.shape
+    short_size = min(height, width)
+    resize_ratio = max(MAX_SIZE / short_size, 1.0)
+    frame = cv2.resize(frame, (int(resize_ratio * width), int(resize_ratio * height)))
+    height, width, _ = frame.shape
+    detected_poses = [visualizer(frame)]
+    visualizer.release_memory()
+    
+    return detected_poses, height, width, frame
+
+
+def save_aligned_img(ori_frame, video_params, max_size):
+    h_min_real, h_max_real, w_min_real, w_max_real = video_params
+    img = ori_frame[h_min_real:h_max_real, w_min_real:w_max_real, :]
+    img_aligened = resize_and_pad(img, max_size=max_size)
+    print('aligned img shape:', img_aligened.shape)
+    save_dir = './assets/refimg_aligned'
+    
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, 'aligned.png')
+    cv2.imwrite(save_path, img_aligened)
+    return save_path
