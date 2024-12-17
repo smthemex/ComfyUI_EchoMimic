@@ -6,8 +6,11 @@ You can use EchoMimic & EchoMimic V2 in comfyui
 
 ## Notice：
 
-**2024/12/10
-* fix bug..
+**2024/12/17
+* 同步官方的DWpose驱动pose方法，但是pose对齐表现普通，所以保留了sapiens的方法，开启方法，infer_mode选择pose_normal_dwpose  
+* Synchronize the official DWpose driver pose method, but pose alignment performs poorly, so the Sapiens method is retained,To activate the method, select 'pose_normal_depose' for infra_mode
+* 默认pose新增了好几个，可以试试 
+* Several new default poses have been added, you can try them out  
 ---
 
 ## Updates:
