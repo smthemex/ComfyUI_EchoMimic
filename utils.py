@@ -153,12 +153,12 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
             pose_d=pose_dir.split("_")[-1]
             logging.info(f"use default pose {pose_dir} for running !")
             pose_dir = os.path.join(cur_path, f"echomimic_v2/assets/halfbody_demo/pose/{pose_d}")
-            USE_Default = False
+            USE_Default = True
         else:
             logging.info(
                 "Use NPY files for custom videos, which must be located in directory 'comfyui/input/tensorrt_lite'")
             pose_dir = os.path.join(tensorrt_lite, pose_dir)
-            USE_Default=True if "sapiens" in pose_dir else False
+            USE_Default=False if "sapiens" in pose_dir else True
             
         
     if seed is not None and seed > -1:
