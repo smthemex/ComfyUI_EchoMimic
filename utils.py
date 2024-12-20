@@ -40,11 +40,50 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
     origin_w = width
     # 处理输入图片的尺寸
     panding_img=img_padding(height, width, ref_image_pil) # 不管输出图片是何种尺寸，为保证图片质量，将输入图片转为为正方形，横裁切，竖填充，长宽为输出尺寸最大
-    infer_image_pil=Image.fromarray(cv2.cvtColor(panding_img,cv2.COLOR_BGR2RGB))
-    #将高宽改成最大图幅，方便裁切
-    height = max(height,width)
+    #### try input image Body alignment 暂时用sapiens
+    # 将高宽改成最大图幅，方便裁切
+    height = max(height, width)
     width = max(height, width)
- 
+    
+    if visualizer and face_detector=="sapiens":
+        visualizer.move_to_cuda()
+        base_image=cv2.imread(os.path.join(cur_path,"echomimic_v2/assets/halfbody_demo/refimag/natural_bk_openhand/0222.png"))
+        base_image=cv2.cvtColor(base_image, cv2.COLOR_BGR2RGB)
+        
+        _, base_image_key, base_image_box_xy = visualizer(np.asarray(base_image), None) #获取基准图片key 和xy数据 1024*1024
+        base_image_length, base_image_left_eye_y = estimate_ratio(base_image_key, base_image_box_xy)
+        
+        panding_img_align = img_padding(1024, 1024, ref_image_pil) #裁切输入图片为1024*1024
+        
+        _, input_img_key, input_img_box_xy = visualizer(np.asarray(panding_img_align), None) #获取实际输入图片的key 和人体box数据
+        input_img_length, input_img_left_eye_y = estimate_ratio(input_img_key, input_img_box_xy) #眼睛坐标为绝对值
+    
+        print(base_image_length,base_image_left_eye_y,input_img_length,input_img_left_eye_y) #603 [201] 679 [220]
+        
+        if base_image_length and base_image_left_eye_y and input_img_length and input_img_left_eye_y:
+            if abs(base_image_length / 1024 - input_img_length / 1024) > 0.005:  # 比例不同须基于输入图片对齐
+                logging.info(
+                    " *** Start input image align . 基于基准图片，开始输入图片的对齐! ***")
+                input_img_left_eye_y_ = input_img_left_eye_y[0] #基于1024的绝对值
+                base_image_left_eye_y_ = base_image_left_eye_y[0]#基于1024的绝对值
+               
+                panding_img=align_img(base_image_length, input_img_length, 1024, 1024, panding_img_align, base_image_left_eye_y_,
+                          input_img_left_eye_y_)
+                
+            else:  # 人体比例接近，但是高度不对，也需要对齐
+                logging.info(
+                    "Starting the input image shift based on the base image . 基于基准图片，开始输入图片手势平移对齐 ! ***")
+                if abs(base_image_left_eye_y[0] / height - input_img_left_eye_y[
+                    0] / height) > 0.005:
+                    panding_img = affine_img(base_image_left_eye_y, input_img_left_eye_y, panding_img_align)
+            print("input image Body alignment is done")
+        panding_img=cv2.resize(panding_img, (width, height), interpolation=cv2.INTER_AREA) #基于1024做的对比，缩放回最大的输出尺寸
+        if not isinstance(video_images,torch.Tensor):#非视频驱动时，完成对齐后，卸载dino模型
+            visualizer.enable_model_cpu_offload()
+            gc.collect()
+            torch.cuda.empty_cache()
+    infer_image_pil=Image.fromarray(cv2.cvtColor(panding_img,cv2.COLOR_BGR2RGB))
+    
     if visualizer and isinstance(video_images,torch.Tensor):
         logging.info("***** start infer video to npy files for drive pose ! ***** ")
         video_len, _, _, _ = video_images.size()
@@ -240,7 +279,6 @@ def process_video_v2(ref_image_pil, uploaded_audio, width, height, length, seed,
         audio_clip.close()
         final_clip.reader.close()
     return ouput_list
-
 
 
 def process_video(face_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio,
@@ -680,8 +718,7 @@ def center_resize_pad(img, new_width, new_height):#为简化，new已是正方�
         else:
             f = center_crop(img, h, h)
         return cv2.resize(f, (new_width, new_height))
-
-        
+       
 
 def img_padding(height,width,ref_image_pil):
     output_max = max(height, width)
@@ -701,19 +738,24 @@ def img_padding(height,width,ref_image_pil):
         return cv2.resize(f, (output_max,output_max), interpolation=cv2.INTER_AREA)
         
 def estimate_ratio(keypoint: list,box_xy,length=None):
+    x1, y1, x2, y2=box_xy
+    bbox_width, bbox_height = x2 - x1, y2 - y1
     left_eye_y = []
     left_shoulder_y = []
     left_elbow_y = []
     for i, (name, (x, y, conf)) in enumerate(keypoint[0].items()):
         if name == "left_eye":
             if conf > 0.3:
-                left_eye_y.append(y)
+                y_coord =int(y * bbox_height / 256) + y1 #获取坐标点在原图的绝对值
+                left_eye_y.append(y_coord)
         if name == "left_shoulder":
             if conf > 0.3:
-                left_shoulder_y.append(y)
+                y_coord = int(y * bbox_height / 256) + y1
+                left_shoulder_y.append(y_coord)
         if name == "left_elbow":
             if conf > 0.3:
-                left_elbow_y.append(y)
+                y_coord = int(y * bbox_height / 256) + y1
+                left_elbow_y.append(y_coord)
     
     if left_eye_y and left_elbow_y:
         length=left_elbow_y[0] - left_eye_y[0]
@@ -722,41 +764,29 @@ def estimate_ratio(keypoint: list,box_xy,length=None):
     else:
         pass
     if left_eye_y:
-        left_eye_y=[left_eye_y[0]+box_xy[0]] #眼部的实际高度要加上box的边界
+        left_eye_y=[left_eye_y[0]]
     return length,left_eye_y
 
 
 def align_img(input_length, first_length, height, width, input_frames_cv2_first, input_left_eye_y, first_left_eye_y):
-    ratio = input_length / first_length  #  82.0 [50.0] 76.0 [41.0] f f  in in
-    
+    ratio = input_length / first_length  #603 [201] 679 [220]
+    input_frames_cv2_first = cv2.resize(input_frames_cv2_first, (int(height * ratio), int(height * ratio)),
+                                        interpolation=cv2.INTER_AREA)  # 缩小
     base_image=np.zeros((height, width,3), np.uint8)
-    if input_length / height < first_length / height:  # 输入图的人物占比要小，pose图需要缩小对齐,0.926 ratio
-        input_frames_cv2_first=cv2.resize(input_frames_cv2_first, (int(height * ratio), int(height * ratio)),
-                   interpolation=cv2.INTER_AREA)    #缩小
-        
-        reduced_image,pad_size=center_paste(base_image, input_frames_cv2_first) #中心粘贴
-    
-        move_ = -int(first_left_eye_y * ratio+pad_size[0] - input_left_eye_y) if first_left_eye_y * ratio +pad_size[0] >= \
-                                                                     input_left_eye_y else \
-             int(input_left_eye_y)- int(first_left_eye_y * ratio+pad_size[0]) #对齐眼睛
-        
-        translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]]) #y轴位移
-        shifted_image = cv2.warpAffine(reduced_image, translation_matrix, (width, height))
-    
+    if input_length / height < first_length / height:  # 输入图的人物占比要小，pose图需要缩小0.88对齐,#603 [201] 679 [220]
+        reduced_image,pad_size=center_paste(base_image, input_frames_cv2_first) #中心粘贴，pad为黑边尺寸
+        eye_y=int(first_left_eye_y*ratio+pad_size[1]) #图片缩放后的绝对值
+
     else:  # pose图里人物的比例小于输入图，pose要放大
-        input_frames_cv2_first=cv2.resize(input_frames_cv2_first, (int(height / ratio), int(height / ratio)),
-                   interpolation=cv2.INTER_AREA) #放大
-        crpo_image=center_crop(input_frames_cv2_first, height, width) #中心裁切
-        
+        reduced_image=center_crop(input_frames_cv2_first, height, width) #中心裁切
         h, w = input_frames_cv2_first.shape[:2]
-        shift_y=(h-height)//2
+        shift_y=(h-height)//2 #图片放大后裁切掉的边界
+        eye_y= int(first_left_eye_y*ratio-shift_y)
         
-        move_ = -int(first_left_eye_y / ratio-shift_y - input_left_eye_y) if first_left_eye_y / ratio-shift_y >= \
-                                                                     input_left_eye_y else \
-            int(input_left_eye_y) - int(first_left_eye_y / ratio-shift_y)
-        
-        translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]])
-        shifted_image = cv2.warpAffine(crpo_image, translation_matrix, (width, height))
+    move_ = -int(eye_y - input_left_eye_y) if eye_y>= int(input_left_eye_y) else int(input_left_eye_y- eye_y) #对齐眼睛
+    translation_matrix = np.float32([[1, 0, 0], [0, 1, move_]])
+    shifted_image = cv2.warpAffine(reduced_image, translation_matrix, (width, height))
+    
     return shifted_image
 
 def center_paste(img_b,img_f):
