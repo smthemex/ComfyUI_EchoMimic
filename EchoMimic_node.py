@@ -458,7 +458,7 @@ class Echo_Sampler:
         if not lowvram:
             pipe.to(device, torch.float16)
         
-        image = cf_tensor2cv(image, width, height)  if version=="V1" else image  # v1 cv ,v2 pil
+        image = cf_tensor2cv(image, width, height)  if version=="V1" else image  # v1 cv ,v2 tensor
         visualizer = kwargs.get("visualizer")
         video_images = kwargs.get("video_images")
         
