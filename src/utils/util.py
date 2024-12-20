@@ -272,6 +272,9 @@ def center_crop(image, crop_width, crop_height):
     x = width // 2 - crop_width // 2
     y = height // 2 - crop_height // 2
     
+    x=max(0,x)
+    y=max(0,y)
+    
     # 裁剪图像
     crop_img = image[y:y + crop_height, x:x + crop_width]
     return crop_img
