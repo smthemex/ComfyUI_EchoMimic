@@ -4,20 +4,17 @@ You can use EchoMimic & EchoMimic V2 in comfyui
 [Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
 
-## Notice：
 
-**2024/12/17
-* 同步官方的DWpose驱动pose方法，但是pose对齐表现普通，所以保留了sapiens的方法，开启方法，infer_mode选择pose_normal_dwpose  
-* Synchronize the official DWpose driver pose method, but pose alignment performs poorly, so the Sapiens method is retained,To activate the method, select 'pose_normal_depose' for infra_mode
-* 默认pose新增了好几个，可以试试 
-* Several new default poses have been added, you can try them out  
+
 ---
 
-## Updates:
-**2024/12/04**  
-* V2版现在跟V1一样，有三种pose驱动方式，第一种，infer_mode选择audio_drive,pose_dir 选择none，则使用默认的npy pose文件，第二种，infer_mode选择audio_drive,pose_dir 选择已有的npy文件夹（位于...ComfyUI/input/tensorrt_lite目录下），第三种，infer_mode选择pose_normal,video_images连接视频入口，确认...ComfyUI/models/echo_mimic 下有yolov8m.pt 和sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2 模型 （见图示和example里的工作流,下载地址见后附）；
-* The V2 version now has three different pose driving modes, just like the V1 version. The first one is to select ‘audio-drive’ for 'infer_mode' and 'none' for 'pose_dir', using the default '*.npy' pose files. The second one is to select audio-drive for infer_mode and an existing '*.npy' folder (located in the... ComfyUI/input/tensorrt_lite directory) for pose_dir. The third one is to select 'pose_normal' for 'infer_mode', connect to the video portal with video_images, and confirm Under ComfyUI/models/echo_mimic, there are 'YOLOV8m.pt' and 'sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2' models (see the workflow in the diagram and example,Please see the download link below)
+## New Updates:
+* 新增输入图片跟基准图片对齐功能（选择pose_normal_sapiens时自动开启，3种驱动方式都能使用，见下面的示例图），修复之前的蒙版对齐错误。
+* Added the function of aligning the input image with the reference image (automatically turned on when selecting pose_normal_sapiens, all three driving methods can be used，See the example diagram below), fixed the previous mask alignment error.
+
+* V2版现在跟V1一样，有三种pose驱动方式，第一种，infer_mode选择audio_drive,pose_dir 选择列表里的几个默认pose，则使用默认的npy pose文件，第二种，infer_mode选择audio_drive,pose_dir 选择已有的npy文件夹（位于...ComfyUI/input/tensorrt_lite目录下），第三种，infer_mode选择pose_normal_dwpose 或pose_normal_sapiens,video_images连接视频入口，确认...ComfyUI/models/echo_mimic 下有yolov8m.pt 和sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2 模型 （见图示和example里的工作流,下载地址见后附）；
 * 因为调用了sapiens的pose方法，所以需要安装yolo的库ultralytics ，安装方法：  pip install ultralytics  
+* The V2 version now has three different pose driving methods, just like the V1 version. The first method is to select audio_drive for infer_mode and default poses from the list for pose_dir, using the default npy pose file. The second method is to select audio-drive for infer_mode and an existing npy folder (located in the... ComfyUI/input/tensorrt_lite directory) for pose_dir. The third method is to select 'pose_normal_dwpose' or 'pose_normal_sapiens' for infer_mode, connect to the video portal with video_images, and confirm Under ComfyUI/models/echo_mimic, there are 'YOLOV8m.pt' and 'sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2' models (see the workflow in the diagram and example,Please see the download link below)
 * Because the pose method of ‘Sapiens’ was called, it is necessary to install YOLO's library ultralytics. Installation method： pip install ultralytics  
 ---
 
@@ -163,6 +160,10 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 
 # 4 Example
 -----
+* 自动对齐输入图片Automatically align input images；  
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/alignA.png)
+![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/align.png)
+
 * V2加载自定义视频驱动视频，V2 loads custom video driver videos  
 ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/example.png)
 
