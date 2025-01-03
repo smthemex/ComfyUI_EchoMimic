@@ -24,6 +24,7 @@ from .utils import load_images, tensor2cv, find_directories, nomarl_upscale, dow
     process_video, narry_list, weight_dtype, cf_tensor2cv,process_video_v2
 from .echomimic_v2.src.models.pose_encoder import PoseEncoder
 from .echomimic_v2.src.pipelines.pipeline_echomimicv2 import EchoMimicV2Pipeline
+from .echomimic_v2.src.pipelines.pipeline_echomimicv2_acc import EchoMimicV2Pipeline as EchoMimicV2PipelineACC
 from .echomimic_v2.src.models.unet_2d_condition import UNet2DConditionModel as UNet2DConditionModelV2
 from .echomimic_v2.src.models.unet_3d_emo import  EMOUNet3DConditionModel as EMOUNet3DConditionModelV2
 from .hallo.video_sr import run_realesrgan, pre_u_loader
@@ -141,13 +142,14 @@ class Echo_LoadModel:
                                  pt_name="config.json")
                 vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device, dtype=weight_dtype)
             except:
-                vae = AutoencoderKL.from_pretrained(vae).to(device, dtype=weight_dtype)
+                #if no model path,use default.
+                vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device, dtype=weight_dtype)
                 
         
         ## reference net init
-        pretrained_base_model_path = get_instance_path(weigths_current_path)
+        #pretrained_base_model_path = get_instance_path(weigths_current_path)
         
-        # pre models
+        # pre base models
         download_weights(weigths_current_path, "lambdalabs/sd-image-variations-diffusers", subfolder="unet",
                          pt_name="diffusion_pytorch_model.bin")
         download_weights(weigths_current_path, "lambdalabs/sd-image-variations-diffusers", subfolder="unet",
@@ -192,40 +194,48 @@ class Echo_LoadModel:
                 denois_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
                                              pt_name="denoising_unet_acc.pth")
         else:
-            logging.info("****** refer in EchoMimic V2 mode!******")
+            
             weigths_current_path_v2 = os.path.join(weigths_current_path, "v2")
             if not os.path.exists(weigths_current_path_v2):
                 os.makedirs(weigths_current_path_v2)
             re_ckpt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
                                        pt_name="reference_unet.pth")
-            motion_path = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
-                                           pt_name="motion_module.pth")
-            denois_pt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
-                                         pt_name="denoising_unet.pth")
             pose_encoder_pt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
                                                pt_name="pose_encoder.pth")
-        
+            
+            if infer_mode!="pose_acc":
+                logging.info("****** refer in EchoMimic V2 normal  mode!******")
+                motion_path = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
+                                               pt_name="motion_module.pth")
+                denois_pt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
+                                             pt_name="denoising_unet.pth")
+            else: #pose_acc
+                logging.info("****** refer in EchoMimic V2 acc mode!******")
+                motion_path = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
+                                               pt_name="motion_module_acc.pth")
+                denois_pt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
+                                             pt_name="denoising_unet_acc.pth")
         # unet init
         if version == "V1":
             try:
                 reference_unet = UNet2DConditionModel.from_config(
-                    pretrained_base_model_path,
+                    weigths_current_path,
                     subfolder="unet",
                 ).to(dtype=weight_dtype)
             except:
                 reference_unet = UNet2DConditionModel.from_pretrained(
-                    pretrained_base_model_path,
+                    weigths_current_path,
                     subfolder="unet",
                 ).to(dtype=weight_dtype)
         else:
             try:
                 reference_unet = UNet2DConditionModelV2.from_config(
-                    pretrained_base_model_path,
+                    weigths_current_path,
                     subfolder="unet",
                 ).to(dtype=weight_dtype)
             except:
                 reference_unet = UNet2DConditionModelV2.from_pretrained(
-                    pretrained_base_model_path,
+                    weigths_current_path,
                     subfolder="unet",
                 ).to(dtype=weight_dtype)
             
@@ -240,14 +250,14 @@ class Echo_LoadModel:
             if denoising:
                 if os.path.exists(motion_path):  ### stage1 + stage2
                     denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-                        pretrained_base_model_path,
+                        weigths_current_path,
                         motion_path,
                         subfolder="unet",
                         unet_additional_kwargs=infer_config.unet_additional_kwargs,
                     ).to(dtype=weight_dtype)
                 else:
                     denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-                        pretrained_base_model_path,
+                        weigths_current_path,
                         "",
                         subfolder="unet",
                         unet_additional_kwargs={
@@ -259,7 +269,7 @@ class Echo_LoadModel:
             else:
                 ### only stage1
                 denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-                    pretrained_base_model_path,
+                    weigths_current_path,
                     "",
                     subfolder="unet",
                     unet_additional_kwargs={
@@ -270,7 +280,7 @@ class Echo_LoadModel:
                 ).to(dtype=weight_dtype, )
         else:  # v2
             denoising_unet = EMOUNet3DConditionModelV2.from_pretrained_2d(
-                pretrained_base_model_path,
+                weigths_current_path,
                 motion_path,
                 subfolder="unet",
                 unet_additional_kwargs=infer_config_v2.unet_additional_kwargs,
@@ -398,14 +408,22 @@ class Echo_LoadModel:
                     scheduler=scheduler,
                 ).to(dtype=weight_dtype)
         else:
-            pipe = EchoMimicV2Pipeline(
-                vae=vae,
-                reference_unet=reference_unet,
-                denoising_unet=denoising_unet,
-                audio_guider=audio_processor,
-                pose_encoder=pose_net,
-                scheduler=scheduler, )
-        
+            if infer_mode != "pose_acc":
+                pipe = EchoMimicV2Pipeline(
+                    vae=vae,
+                    reference_unet=reference_unet,
+                    denoising_unet=denoising_unet,
+                    audio_guider=audio_processor,
+                    pose_encoder=pose_net,
+                    scheduler=scheduler, )
+            else:
+                pipe = EchoMimicV2PipelineACC(
+                    vae=vae,
+                    reference_unet=reference_unet,
+                    denoising_unet=denoising_unet,
+                    audio_guider=audio_processor,
+                    pose_encoder=pose_net,
+                    scheduler=scheduler, )
         pipe.enable_vae_slicing()
         if lowvram:
             pipe.enable_sequential_cpu_offload()
