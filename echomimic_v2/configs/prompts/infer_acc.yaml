@@ -1,0 +1,41 @@
+pretrained_base_model_path: "./pretrained_weights/sd-image-variations-diffusers"
+pretrained_vae_path: "./pretrained_weights/sd-vae-ft-mse"
+image_encoder_path: "./pretrained_weights/sd-image-variations-diffusers/image_encoder"
+
+denoising_unet_path: './pretrained_weights/denoising_unet_acc.pth'
+reference_unet_path: "./pretrained_weights/reference_unet.pth"
+pose_encoder_path: "./pretrained_weights/pose_encoder.pth"
+motion_module_path: './pretrained_weights/motion_module_acc.pth'
+
+audio_mapper_path: "./pretrained_weights/audio_mapper-50000.pth"
+auido_guider_path: "./pretrained_weights/wav2vec2-base-960h"
+auto_flow_path: "./pretrained_weights/AutoFlow"
+audio_model_path: "./pretrained_weights/audio_processor/tiny.pt"
+inference_config: "./configs/inference/inference_v2.yaml"
+weight_dtype: 'fp16'
+
+test_cases:
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0014.png":
+    - "./assets/halfbody_demo/audio/chinese/echomimicv2_woman.wav"
+    - "./assets/halfbody_demo/pose/01/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0077.png":
+    - "./assets/halfbody_demo/audio/chinese/ultraman.wav"
+    - "./assets/halfbody_demo/pose/ultraman/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0082.png":
+    - "./assets/halfbody_demo/audio/chinese/good.wav"
+    - "./assets/halfbody_demo/pose/good/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0181.png":
+    - "./assets/halfbody_demo/audio/chinese/no_smoking.wav"
+    - "./assets/halfbody_demo/pose/02/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0204.png":
+    - "./assets/halfbody_demo/audio/chinese/no_smoking.wav"
+    - "./assets/halfbody_demo/pose/03/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0205.png":
+    - "./assets/halfbody_demo/audio/chinese/echomimicv2_woman.wav"
+    - "./assets/halfbody_demo/pose/04/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0222.png":
+    - "./assets/halfbody_demo/audio/chinese/echomimicv2_man.wav"
+    - "../echomimic_v2/assets/halfbody_demo/pose/fight/"
+  "./assets/halfbody_demo/refimag/natural_bk_openhand/0247.png":
+    - "./assets/halfbody_demo/audio/chinese/fighting.wav"
+    - "../echomimic_v2/assets/halfbody_demo/pose/salute/"
