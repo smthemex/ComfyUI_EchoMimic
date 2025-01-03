@@ -8,7 +8,12 @@ You can use EchoMimic & EchoMimic V2 in comfyui
 
 ---
 
-## New Updates:
+## New Updates 2025-01-03:
+* 支持新版的ACC模型，在infer_mode里选择pose_acc开启，如果外网通畅会自动下载，你也可以从[这里](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)预下载（denoising_unet_acc.pth和motion_module_acc.pth），并放在ComfyUI\models\echo_mimic\v2里，推荐的步数为6步，尺寸为768*768。ACC模型较大，小显存耗时可能会比较长；  
+* Support the new version of ACC model, select 'pose_acc' to enable in 'infer_mode', and if the network is smooth, it will automatically download. You can also pre download from [here](https://huggingface.co/BadToBest/EchoMimicV2/tree/main) and put it in A. The recommended steps are '6'and the size is 768 * 768. The ACC model is relatively large, and low video memory consumption may be longer
+
+
+**Previous updates：**  
 * 新增输入图片跟基准图片对齐功能（选择pose_normal_sapiens时自动开启，3种驱动方式都能使用，见下面的示例图），修复之前的蒙版对齐错误。
 * Added the function of aligning the input image with the reference image (automatically turned on when selecting pose_normal_sapiens, all three driving methods can be used，See the example diagram below), fixed the previous mask alignment error.
 
@@ -81,7 +86,7 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 
 # 3. Models Required 
 ----
-* 3.1 V1 & V2 Shared model v1 和 v2 共用的模型:   
+**3.1 V1 & V2 Shared model v1 和 v2 共用的模型**:   
 如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
 3.11 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)   
 3.12 V1 & V2 audio  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
@@ -101,7 +106,7 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 
 ```
 
-* 3.2 V1 models V1使用以下模型:   
+**3.2 V1 models V1使用以下模型**:   
 V1 address   [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
 Audio-Drived Algo Inference 音频驱动        
 ```
@@ -110,14 +115,9 @@ Audio-Drived Algo Inference 音频驱动
 |         ├── face_locator.pth
 |         ├── motion_module.pth
 |         ├── reference_unet.pth
-```
-Audio-Drived Algo Inference  acc  音频驱动加速版  
-```
-├── ComfyUI/models/echo_mimic
+Audio-Drived Algo Inference  acc  音频驱动加速版
 |         ├── denoising_unet_acc.pth
-|         ├── face_locator.pth
 |         ├── motion_module_acc.pth
-|         ├── reference_unet.pth
 ```
 
 Using Pose-Drived Algo Inference  姿态驱动   
@@ -127,14 +127,9 @@ Using Pose-Drived Algo Inference  姿态驱动
 |         ├── face_locator_pose.pth
 |         ├── motion_module_pose.pth
 |         ├── reference_unet_pose.pth
-```
-Using Pose-Drived Algo Inference  ACC   姿态驱动加速版   
-```
-├── ComfyUI/models/echo_mimic
+Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 |         ├── denoising_unet_pose_acc.pth
-|         ├── face_locator_pose.pth
 |         ├── motion_module_pose_acc.pth
-|         ├── reference_unet_pose.pth
 ```
 
 **3.2 v2 version**   
@@ -146,6 +141,9 @@ use model below V2, Automatic download, you can manually add it 使用以下模�
 |         ├── motion_module.pth
 |         ├── pose_encoder.pth
 |         ├── reference_unet.pth
+if use acc 姿态驱动加速版   
+|         ├── denoising_unet_acc.pth
+|         ├── motion_module_acc.pth
 ```
 YOLOm8 [download link](https://huggingface.co/Ultralytics/YOLOv8/tree/main)   
 sapiens pose [download link](https://huggingface.co/facebook/sapiens-pose-1b-torchscript/tree/main)  
@@ -193,20 +191,20 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 
 # 5 Function Description
 ---
---infer_mode：音频驱动视频生成，“audio_drived” 和"audio_drived_acc"；      
---infer_mode：参考pkl模型文件视频pose生成 "pose_normal", "pose_acc"；   
+* infer_mode：音频驱动视频生成，“audio_drived” 和"audio_drived_acc"；      
+* infer_mode：参考pkl模型文件视频pose生成 "pose_normal", "pose_acc"；   
     ----motion_sync：如果打开且video_file有视频文件时，生成pkl文件，并生成参考视频的视频；pkl文件在input\tensorrt_lite 目录下，再次使用需要重启comfyUI。   
     ----motion_sync：如果关闭且pose_mode不为none的时候，读取选定的pose_mode目录名的pkl文件，生成pose视频；如果pose_mode为空的时候，生成基于默认assets\test_pose_demo_pose的视频   
  
 **特别的选项**：  
-   --save_video：如果不想使用VH节点时，可以开启，默认关闭；     
-   --draw_mouse：你可以试试；    
-   --length：帧数，时长等于length/fps；     
-   --acc模型 ，6步就可以，但是质量略有下降；   
-   --lowvram :低显存用户可以开启 lowvram users can enable it  
-   --内置内置图片等比例裁切。   
+  * save_video：如果不想使用VH节点时，可以开启，默认关闭；     
+  * draw_mouse：你可以试试；    
+  * length：帧数，时长等于length/fps；     
+  * acc模型 ，6步就可以，但是质量略有下降；   
+  * lowvram :低显存用户可以开启 lowvram users can enable it  
+  * 内置内置图片等比例裁切。   
 **特别注意的地方**：   
-   --cfg数值设置为1，仅在turbo模式有效，其他会报错。    
+  * cfg数值设置为1，仅在turbo模式有效，其他会报错。    
 
 **Infir_mode**: Audio driven video generation, "audio-d rived" and "audio-d rived_acc";   
 **Infer_rode**: Refer to the PKL model file to generate "pose_normal" and "pose_acc" for the video pose;   
