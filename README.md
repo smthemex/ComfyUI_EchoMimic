@@ -9,8 +9,8 @@ You can use EchoMimic & EchoMimic V2 in comfyui
 ---
 
 ## New Updates 2025-01-03:
-* 支持新版的ACC模型，在infer_mode里选择pose_acc开启，如果外网通畅会自动下载，你也可以从[这里](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)预下载（denoising_unet_acc.pth和motion_module_acc.pth），并放在ComfyUI\models\echo_mimic\v2里，推荐的步数为6步，尺寸为768*768。ACC模型较大，小显存耗时可能会比较长；  
-* Support the new version of ACC model, select 'pose_acc' to enable in 'infer_mode', and if the network is smooth, it will automatically download. You can also pre download from [here](https://huggingface.co/BadToBest/EchoMimicV2/tree/main) and put it in A. The recommended steps are '6'and the size is 768 * 768. The ACC model is relatively large, and low video memory consumption may be longer
+* 支持新版的ACC模型，在infer_mode里选择pose_acc开启，如果外网通畅会自动下载，你也可以从[这里](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)预下载（denoising_unet_acc.pth和motion_module_acc.pth），并放在ComfyUI\models\echo_mimic\v2里，推荐的步数为6步,cfg为1，尺寸为768*768。ACC模型较大，小显存耗时可能会比较长；  
+* Support the new version of ACC model, select 'pose_acc' to enable in 'infer_mode', and if the network is smooth, it will automatically download. You can also pre download from [here](https://huggingface.co/BadToBest/EchoMimicV2/tree/main) and put it in A. The recommended 'steps' are '6' ,'cfg' is '1' and the size is 768 * 768. The ACC model is relatively large, and low video memory consumption may be longer
 
 
 **Previous updates：**  
