@@ -22,8 +22,8 @@ from einops import rearrange
 from tqdm import tqdm
 
 from ..models.mutual_self_attention import ReferenceAttentionControl
-from ..pipelines.context import get_context_scheduler
-from ..pipelines.utils import get_tensor_interpolation_method
+from .context import get_context_scheduler
+from .utils import get_tensor_interpolation_method
 
 
 @dataclass
