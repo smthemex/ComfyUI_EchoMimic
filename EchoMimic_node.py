@@ -20,16 +20,13 @@ from .src.pipelines.pipeline_echo_mimic_pose_acc import AudioPose2VideoPipeline 
 from .src.models.face_locator import FaceLocator
 from .src.utils.draw_utils import FaceMeshVisualizer
 from .src.utils.motion_utils import motion_sync
-from .utils import load_images, tensor2cv, find_directories, nomarl_upscale, download_weights, get_instance_path, \
+from .utils import find_directories, download_weights,  \
     process_video, narry_list, weight_dtype, cf_tensor2cv,process_video_v2
 from .echomimic_v2.src.models.pose_encoder import PoseEncoder
 from .echomimic_v2.src.pipelines.pipeline_echomimicv2 import EchoMimicV2Pipeline
 from .echomimic_v2.src.pipelines.pipeline_echomimicv2_acc import EchoMimicV2Pipeline as EchoMimicV2PipelineACC
 from .echomimic_v2.src.models.unet_2d_condition import UNet2DConditionModel as UNet2DConditionModelV2
 from .echomimic_v2.src.models.unet_3d_emo import  EMOUNet3DConditionModel as EMOUNet3DConditionModelV2
-from .hallo.video_sr import run_realesrgan, pre_u_loader
-from pathlib import Path
-from huggingface_hub import hf_hub_download
 import folder_paths
 import platform
 import subprocess
@@ -37,19 +34,12 @@ import subprocess
 MAX_SEED = np.iinfo(np.int32).max
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 current_path = os.path.dirname(os.path.abspath(__file__))
+
 inference_config_path = os.path.join(current_path, "configs", "inference", "inference_v2.yaml")
 infer_config = OmegaConf.load(inference_config_path)
 inference_config_path_v2 = os.path.join(current_path, "echomimic_v2/configs/inference/inference_v2.yaml")
 infer_config_v2 = OmegaConf.load(inference_config_path_v2)
 
-weigths_hallo_current_path = os.path.join(folder_paths.models_dir, "Hallo")
-if not os.path.exists(weigths_hallo_current_path):
-    os.makedirs(weigths_hallo_current_path)
-
-try:
-    folder_paths.add_model_folder_path("Hallo", weigths_hallo_current_path, False)
-except:
-    folder_paths.add_model_folder_path("Hallo", weigths_hallo_current_path)
 
 # pre dir
 weigths_current_path = os.path.join(folder_paths.models_dir, "echo_mimic")
@@ -72,15 +62,6 @@ tensorrt_lite = os.path.join(folder_paths.get_input_directory(), "tensorrt_lite"
 if not os.path.exists(tensorrt_lite):
     os.makedirs(tensorrt_lite)
 
-# upscale dir
-weigths_facelib_path = os.path.join(weigths_hallo_current_path, "facelib")
-if not os.path.exists(weigths_hallo_current_path):
-    os.makedirs(weigths_facelib_path)
-
-weigths_face_analysis_path = os.path.join(weigths_hallo_current_path, "face_analysis/models")
-weigths_face_analysis_dir = os.path.join(weigths_hallo_current_path, "face_analysis")
-if not os.path.exists(weigths_face_analysis_path):
-    os.makedirs(weigths_face_analysis_path)
 
 # ffmpeg
 ffmpeg_path = os.getenv('FFMPEG_PATH')
@@ -132,20 +113,22 @@ class Echo_LoadModel:
         
         ## vae init  #using local vae first
         try:
-            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,
-                                                                             dtype=weight_dtype)  # using local vae first
+            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype)  # using local vae first
         except:
-            try:  # try downlaod model ,and load local vae
-                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
-                                 pt_name="diffusion_pytorch_model.safetensors")
-                download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
-                                 pt_name="config.json")
-                vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device, dtype=weight_dtype)
+            try:
+                vae = AutoencoderKL.from_pretrained(vae).to(device, dtype=weight_dtype) #use input
             except:
-                #if no model path,use default.
-                vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device, dtype=weight_dtype)
-                
-        
+                try:
+                    # try downlaod model ,and load local vae
+                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
+                                     pt_name="diffusion_pytorch_model.safetensors")
+                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
+                                     pt_name="config.json")
+                    vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device, dtype=weight_dtype)
+                except:
+                    # if no model path,use default.
+                    vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device, dtype=weight_dtype)
+              
         ## reference net init
         #pretrained_base_model_path = get_instance_path(weigths_current_path)
         
@@ -160,7 +143,7 @@ class Echo_LoadModel:
         # pre pth
         if version == "V1":
             logging.info("****** refer in EchoMimic V1 mode!******")
-            if infer_mode == "pose_normal":
+            if infer_mode == "pose_normal_dwpose" or  infer_mode == "pose_normal_sapiens" :
                 re_ckpt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
                                            pt_name="reference_unet_pose.pth")
                 face_locator_pt = download_weights(weigths_current_path, "BadToBest/EchoMimic",
@@ -204,7 +187,7 @@ class Echo_LoadModel:
                                                pt_name="pose_encoder.pth")
             
             if infer_mode!="pose_acc":
-                logging.info("****** refer in EchoMimic V2 normal  mode!******")
+                logging.info("****** refer in EchoMimic V2 normal mode!******")
                 motion_path = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
                                                pt_name="motion_module.pth")
                 denois_pt = download_weights(weigths_current_path_v2, "BadToBest/EchoMimicV2",
@@ -371,7 +354,7 @@ class Echo_LoadModel:
         scheduler = DDIMScheduler(**sched_kwargs)
        
         if version == "V1":
-            if infer_mode == "pose_normal":
+            if infer_mode == "pose_normal_dwpose" or  infer_mode == "pose_normal_sapiens":
                 pipe = AudioPose2VideoPipeline(
                     vae=vae,
                     reference_unet=reference_unet,
@@ -509,223 +492,13 @@ class Echo_Sampler:
         return (images, audio, frame_rate)
 
 
-class Echo_Upscaleloader:
-    def __init__(self):
-        pass
-    
-    @classmethod
-    def INPUT_TYPES(s):
-        ckpt_list_filter_U = [i for i in folder_paths.get_filename_list("Hallo") if i.endswith(".pth") and "lib" in i]
-        upscale_list = [i for i in folder_paths.get_filename_list("upscale_models") if "x2plus" in i.lower()]
-        return {
-            "required": {
-                "realesrgan": (["none"] + upscale_list,),
-                "face_detection_model": (["none"] + ckpt_list_filter_U,),
-                "bg_upsampler": (['realesrgan', 'none', ],),
-                "face_upsample": ("BOOLEAN", {"default": False},),
-                "has_aligned": ("BOOLEAN", {"default": False},),
-                "bg_tile": ("INT", {
-                    "default": 400,
-                    "min": 200,  # Minimum value
-                    "max": 1000,  # Maximum value
-                    "step": 10,  # Slider's step
-                    "display": "number",  # Cosmetic only: display as "number" or "slider"
-                }),
-                "upscale": ("INT", {
-                    "default": 2,
-                    "min": 2,  # Minimum value
-                    "max": 4,  # Maximum value
-                    "step": 2,  # Slider's step
-                    "display": "number",  # Cosmetic only: display as "number" or "slider"
-                }),
-            },
-        }
-    
-    RETURN_TYPES = ("ECHO_U_MODEL",)
-    RETURN_NAMES = ("model",)
-    FUNCTION = "Upscale_main"
-    CATEGORY = "EchoMimic"
-    
-    def Upscale_main(self, realesrgan, face_detection_model, bg_upsampler, face_upsample, has_aligned, bg_tile,
-                     upscale):
-        
-        if realesrgan == "none":
-            if not "RealESRGAN_x2plus.pth" in folder_paths.get_filename_list("upscale_models"):
-                logging.info("NO RealESRGAN_x2plus.pth find in upscale_models dir,start auto download")
-                model_path = hf_hub_download(
-                    repo_id="fudan-generative-ai/hallo2",
-                    subfolder="realesrgan",
-                    filename="RealESRGAN_x2plus.pth",
-                    local_dir=os.path.join(folder_paths.models_dir, "upscale_models"),
-                )
-            else:
-                raise "Need choice 'RealESRGAN_x2plus.pth' at 'realesrgan' menu"
-        else:
-            model_path = folder_paths.get_full_path("upscale_models", realesrgan)
-        
-        parse_model = os.path.join(weigths_facelib_path, "parsing_parsenet.pth")
-        if not os.path.exists(parse_model):
-            print(f" No 'parsing_parsenet.pth' in {parse_model} ,try download from huggingface!")
-            hf_hub_download(
-                repo_id="fudan-generative-ai/hallo2",
-                subfolder="facelib",
-                filename="parsing_parsenet.pth",
-                local_dir=weigths_hallo_current_path,
-            )
-        
-        if face_detection_model == "none":
-            if not "detection_Resnet50_Final.pth" in folder_paths.get_filename_list("Hallo"):
-                logging.info("NO detection_Resnet50_Final.pth find in Hallo dir,start auto download")
-                face_detection_model = hf_hub_download(
-                    repo_id="fudan-generative-ai/hallo2",
-                    subfolder="facelib",
-                    filename="detection_Resnet50_Final.pth",
-                    local_dir=weigths_hallo_current_path,
-                )
-            else:
-                raise "need chocie a face_detection_model,resent or yolov5"
-        else:
-            face_detection_model = folder_paths.get_full_path("Hallo", face_detection_model)
-        
-        hallo_model_path = os.path.join(weigths_hallo_current_path, "hallo2", "net_g.pth")
-        if not os.path.exists(hallo_model_path):
-            print(f"no net_g.pth in {weigths_hallo_current_path}/hallo2 ,try download from huggingface!")
-            hf_hub_download(
-                repo_id="fudan-generative-ai/hallo2",
-                subfolder="hallo2",
-                filename="net_g.pth",
-                local_dir=weigths_hallo_current_path,
-            )
-        
-        net, face_upsampler, bg_upsampler, face_helper = pre_u_loader(bg_upsampler, model_path, bg_tile, upscale,
-                                                                      face_upsample, device, hallo_model_path,
-                                                                      face_detection_model, parse_model, has_aligned)
-        model = {"net": net, "face_upsampler": face_upsampler, "bg_upsampler": bg_upsampler, "upscale": upscale,
-                 "face_helper": face_helper, "has_aligned": has_aligned, "face_upsample": face_upsample}
-        return (model,)
-
-
-class Echo_VideoUpscale:
-    def __init__(self):
-        pass
-    
-    @classmethod
-    def INPUT_TYPES(s):
-        input_path = folder_paths.get_input_directory()
-        video_files = [f for f in os.listdir(input_path) if
-                       os.path.isfile(os.path.join(input_path, f)) and f.split('.')[-1] in ['webm', 'mp4', 'mkv',
-                                                                                            'gif']]
-        return {
-            "required": {
-                "model": ("ECHO_U_MODEL",),
-                "video_path": (["none"] + video_files,),
-                "fidelity_weight": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.1,
-                    "round": 0.01,
-                    "display": "number",
-                }),
-                "only_center_face": ("BOOLEAN", {"default": False},),
-                "draw_box": ("BOOLEAN", {"default": False},),
-                "save_video": ("BOOLEAN", {"default": False},),
-                
-            },
-            "optional": {"image": ("IMAGE",),
-                         "audio": ("AUDIO",),
-                         "frame_rate": ("FLOAT", {"forceInput": True, "default": 0.5, }),
-                         "path": ("STRING", {"forceInput": True, "default": "", }),
-                         },
-        }
-    
-    RETURN_TYPES = ("IMAGE", "AUDIO", "FLOAT",)
-    RETURN_NAMES = ("image", "audio", "frame_rate")
-    FUNCTION = "Upscale_main"
-    CATEGORY = "EchoMimic"
-    
-    def Upscale_main(self, model, video_path, fidelity_weight, only_center_face, draw_box, save_video, **kwargs):
-        # pre data
-        video_img = kwargs.get("image")
-        audio = kwargs.get("audio")
-        frame_rate = kwargs.get("frame_rate")
-        sampler_path = kwargs.get("path")
-        
-        # pre model
-        net_g = model.get("net")
-        face_upsampler = model.get("face_upsampler")
-        bg_upsampler = model.get("bg_upsampler")
-        upscale = model.get("upscale")
-        face_helper = model.get("face_helper")
-        has_aligned = model.get("has_aligned")
-        face_upsample = model.get("face_upsample")
-        
-        front_path = Path(sampler_path) if sampler_path and os.path.exists(Path(sampler_path)) else None
-        video_list = []
-        if isinstance(video_img, list):
-            if isinstance(video_img[0], torch.Tensor):
-                video_list = video_img
-        elif isinstance(video_img, torch.Tensor):
-            b, _, _, _ = video_img.size()
-            if b == 1:
-                img = [b]
-                while img is not []:
-                    video_list += img
-            else:
-                video_list = torch.chunk(video_img, chunks=b)
-        
-        print(len(video_list))
-        video_list = [tensor2cv(i) for i in video_list] if video_list else []  # tensor to np
-        
-        if video_path != "none":
-            if front_path is not None:
-                path = front_path
-            else:
-                path = os.path.join(folder_paths.get_input_directory(), video_path)
-        else:
-            if front_path is not None:
-                path = front_path
-            else:
-                path = None
-        
-        if video_list:  # prior choice
-            path = None
-        
-        if not video_list and video_path == "none" and not front_path:
-            raise "Need choice a video or link 'path or image' in the front!!!"
-        
-        output_path = folder_paths.get_output_directory()
-        
-        # infer
-        print("Start to video upscale processing...")
-        video_image, audio_form_v, fps = run_realesrgan(video_list, audio, frame_rate, fidelity_weight, path,
-                                                        output_path,
-                                                        has_aligned, only_center_face, draw_box, bg_upsampler,
-                                                        save_video, net_g, face_upsampler, upscale, face_helper,
-                                                        face_upsample, suffix="", )
-        if path is not None:
-            audio = audio_form_v
-        frame_rate = float(fps)
-        
-        img_list = []
-        if isinstance(video_image, list):
-            for i in video_image:
-                for j in i:
-                    img_list.append(j)
-        
-        image = load_images(img_list)
-        return (image, audio, frame_rate,)
-
 
 NODE_CLASS_MAPPINGS = {
     "Echo_LoadModel": Echo_LoadModel,
     "Echo_Sampler": Echo_Sampler,
-    "Echo_Upscaleloader": Echo_Upscaleloader,
-    "Echo_VideoUpscale": Echo_VideoUpscale
 }
+
 NODE_DISPLAY_NAME_MAPPINGS = {
     "Echo_LoadModel": "Echo_LoadModel",
     "Echo_Sampler": "Echo_Sampler",
-    "Echo_Upscaleloader": "Echo_Upscaleloader",
-    "Echo_VideoUpscale": "Echo_VideoUpscale"
 }
