@@ -4,11 +4,12 @@ You can use EchoMimic & EchoMimic V2 in comfyui
 [Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
 
-
-
 ---
 
-## New Updates 2025-01-03:
+## New Updates 2025-01-04:
+* Hallo2的放大功能并不是必须项目，已移植其他分支，主分支已删除掉Hallo2的内容  
+* The amplification function of Hallo2 is not a mandatory item, it has been ported to other branches, and the content of Hallo2 has been deleted from the main branch  
+
 * 支持新版的ACC模型，在infer_mode里选择pose_acc开启，如果外网通畅会自动下载，你也可以从[这里](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)预下载（denoising_unet_acc.pth和motion_module_acc.pth），并放在ComfyUI\models\echo_mimic\v2里，推荐的步数为6步,cfg为1，尺寸为768*768。ACC模型较大，小显存耗时可能会比较长；  
 * Support the new version of ACC model, select 'pose_acc' to enable in 'infer_mode', and if the network is smooth, it will automatically download. You can also pre download from [here](https://huggingface.co/BadToBest/EchoMimicV2/tree/main) and put it in A. The recommended 'steps' are '6' ,'cfg' is '1' and the size is 768 * 768. The ACC model is relatively large, and low video memory consumption may be longer
 
@@ -36,11 +37,16 @@ git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 
 ```
 pip install -r requirements.txt
-pip install --no-deps facenet-pytorch
 ```
-Notice
+
+# Notice
 ---
-* 如果安装facenet-pytorch后comfyUI奔溃，可以先卸载torch，然后再重新安装，以下版本只是示例：
+If use v1 version 如果要使用V1版本： 
+```
+pip install --no-deps facenet-pytorch 
+
+```
+* 因为V1版本才需求facenet-pytorch，所以不使用V1版是不需要安装facenet-pytorch的，如果安装facenet-pytorch后comfyUI崩了，可以先卸载torch，然后再重新安装，以下版本只是示例：
 * if comfyUI  broken after pip  install  facenet-pytorch ,try this below: 
 ```
 pip uninstall torchaudio torchvision torch xformers
@@ -88,10 +94,9 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 ----
 **3.1 V1 & V2 Shared model v1 和 v2 共用的模型**:   
 如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
-3.11 unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)   
-3.12 V1 & V2 audio  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)   
-3.13 vae(stabilityai/sd-vae-ft-mse)    [link](https://huggingface.co/stabilityai/sd-vae-ft-mse)        
-3.14 optional (可选) hallo upscale [huggingface](https://huggingface.co/fudan-generative-ai/hallo2/tree/main)  # auto downlad
+* unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)    
+* V1 & V2 audio  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
+* vae(stabilityai/sd-vae-ft-mse)    [link](https://huggingface.co/stabilityai/sd-vae-ft-mse)          
 
 ```
 ├── ComfyUI/models/ echo_mimic
@@ -107,8 +112,8 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 ```
 
 **3.2 V1 models V1使用以下模型**:   
-V1 address   [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
-Audio-Drived Algo Inference 音频驱动        
+* V1 address   [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
+* Audio-Drived Algo Inference 音频驱动        
 ```
 ├── ComfyUI/models/echo_mimic
 |         ├── denoising_unet.pth
@@ -120,7 +125,7 @@ Audio-Drived Algo Inference  acc  音频驱动加速版
 |         ├── motion_module_acc.pth
 ```
 
-Using Pose-Drived Algo Inference  姿态驱动   
+* Using Pose-Drived Algo Inference  姿态驱动   
 ```
 ├── ComfyUI/models/echo_mimic
 |         ├── denoising_unet_pose.pth
@@ -178,14 +183,10 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 * mormal Audio-Drived Algo Inference   The old  version  workflow  音频驱动视频常规示例 旧版  
 ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/audio2video.png)
 
-* mormal Audio-Drived Algo Inference   The old version  workflow  音频驱动视频常规示例  2倍放大 1024*1024  旧版本    
-![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/echonew.png)
-
 * pose from pkl，The old  version, 基于预生成的pkl模型生成视频.  旧版      
  ![](https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/new.png)
 
 * 示例的 VH node ComfyUI-VideoHelperSuite node: [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
-
 
 ---
 
@@ -226,19 +227,15 @@ Special attention should be paid to:
 **既往更新：**  
 
 * 增加detection_Resnet50_Final.pth 和RealESRGAN_x2plus.pth自动下载的代码，首次使用，保持realesrgan和face_detection_model菜单为‘none’（无）时就会自动下载，如果菜单里已有模型，请选择模型。    
-* 新增hallo2的2倍放大节点，输入视频的尺寸必须是512 * 512方形，输出为1024 * 1024
-* 当你用torch 2.2.0+cuda 成功安装最新的facenet-pytorch库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：   
-* 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。     
-* 修改vae模型的加载方式，移至ComfyUI/models/echo_mimic/vae路径（详细见下方模型存放地址指示图），降低hf加载模型的优先级，适用于无梯子用户。     
+* 当你用torch 2.2.0+cuda 成功安装最新的facenet-pytorch库后，可以卸载掉基于 2.2.0版本的torch torchvision torchaudio xformers 然后重新安装更高版本的torch torchvision torchaudio xformers，以下是卸载和安装的示例（假设安装torch2.4）：
+* facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切  
+* 添加lowvram模式，方便6G或者8G显存用户使用，注意，开启之后会很慢，而且占用内存较大，请谨慎尝试。      
 
 
 **Previous updates：**   
 * ﻿The magnification factor of 'facecrop-ratio' is '1/facecrop-ratio'. If set to 0.5, the face will be magnified twice. It is recommended to adjust facecrop-ratio to a smaller value only when the proportion of faces in the reference image or driving video is very small,Do not cut when it is 1 or 0;     
-* facecrop_ratio的放大系数为1/facecrop_ratio，如果设置为0.5，面部会得到2倍的放大，建议只在参考图片或者驱动视频中的人脸占比很小的时候，才将facecrop_ratio调整为较小的值.为1 或者0 时不裁切  
-* Add upscale model and Resnet model auto download codes（if had ，they in comfyUI/models/upscale_models/RealESRGAN_x2plus.pth and comfyUI/models/Hallo/facelib/detection_Resnet50_Final.pth）， first use ，keep “realesrgan” and “face_detection_model” ‘none’ will auto download.. 
 * After successfully installing the latest ‘facenet-pytorch’ library using torch 2.2.0+CUDA, you can uninstall torch torch vision torch audio xformers based on version 2.2.0 and then reinstall a higher version of torch、 torch vision、 torch audio xformers. Here is an example of uninstallation and installation (installing torch 2.4):  
 * Add lowvram mode for convenient use by 6G or 8G video memory users. Please note that it will be slow and consume a large amount of memory when turned on. Please try carefully  
-
   
 ---
 
@@ -266,18 +263,6 @@ EchoMimici-V2
   primaryClass={cs.CV}
 }
 ```
-
-hallo2
-``` python  
-@misc{cui2024hallo2,
-	title={Hallo2: Long-Duration and High-Resolution Audio-driven Portrait Image Animation},
-	author={Jiahao Cui and Hui Li and Yao Yao and Hao Zhu and Hanlin Shang and Kaihui Cheng and Hang Zhou and Siyu Zhu and️ Jingdong Wang},
-	year={2024},
-	eprint={2410.07718},
-	archivePrefix={arXiv},
-	primaryClass={cs.CV}
-}
-```
 sapiens
 ```
 @article{khirodkar2024sapiens,
@@ -287,5 +272,4 @@ sapiens
   year={2024}
 }
 ```
-
 
