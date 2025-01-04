@@ -7,7 +7,6 @@ import torch
 from PIL import Image
 import numpy as np
 import cv2
-import sys
 import pickle
 import gc
 import shutil
@@ -27,6 +26,7 @@ from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 from comfy.utils import common_upscale,ProgressBar
 import folder_paths
 from multiprocessing.pool import ThreadPool
+
 weight_dtype = torch.float16
 cur_path = os.path.dirname(os.path.abspath(__file__))
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -503,28 +503,24 @@ def download_weights(file_dir,repo_id,subfolder="",pt_name=""):
         if not os.path.exists(sub_dir):
             os.makedirs(sub_dir)
         if not os.path.exists(file_path):
-            pt_path = hf_hub_download(
+            file_path = hf_hub_download(
                 repo_id=repo_id,
                 subfolder=subfolder,
                 filename=pt_name,
                 local_dir = file_dir,
             )
-        else:
-            pt_path=get_instance_path(file_path)
-        return pt_path
+        return file_path
     else:
         file_path = os.path.join(file_dir, pt_name)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         if not os.path.exists(file_path):
-            pt_path = hf_hub_download(
+            file_path = hf_hub_download(
                 repo_id=repo_id,
                 filename=pt_name,
                 local_dir=file_dir,
             )
-        else:
-            pt_path=get_instance_path(file_path)
-        return pt_path
+        return file_path
 
 
 def pil2narry(img):
@@ -548,15 +544,6 @@ def get_video_img(tensor):
         x = tensor_to_pil(x)
         outputs.append(x)
     yield outputs
-
-def instance_path(path, repo):
-    if repo == "":
-        if path == "none":
-            repo = "none"
-        else:
-            model_path = get_local_path(folder_paths.base_path, path)
-            repo = get_instance_path(model_path)
-    return repo
 
 
 def gen_img_form_video(tensor):
@@ -589,20 +576,6 @@ def tensor_upscale(img_tensor, width, height):
     img = common_upscale(samples, width, height, "nearest-exact", "center")
     samples = img.movedim(1, -1)
     return samples
-
-def get_local_path(comfy_file_path, model_path):
-    path = os.path.join(comfy_file_path, "models", "diffusers", model_path)
-    model_path = os.path.normpath(path)
-    if sys.platform == 'win32':
-        model_path = model_path.replace('\\', "/")
-    return model_path
-
-def get_instance_path(path):
-    instance_path = os.path.normpath(path)
-    if sys.platform == 'win32':
-        instance_path = instance_path.replace('\\', "/")
-    return instance_path
-
 
 def tensor2cv(tensor_image):
     if len(tensor_image.shape)==4:# b hwc to hwc
