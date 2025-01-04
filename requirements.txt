@@ -10,15 +10,11 @@ lpips
 torchmetrics
 torchtyping
 tqdm
-ffmpeg-python
 torch
 torchvision
 torchaudio
-mediapipe
 transformers
 diffusers
 einops
 #facenet_pytorch
 #controlnet-aux
-
-
