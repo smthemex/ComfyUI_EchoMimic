@@ -295,7 +295,7 @@ class Echo_LoadModel:
             # pose net init
             pose_net = PoseEncoder(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(device=device,
                 dtype=weight_dtype)
-            pose_state = torch.load(pose_encoder_pt)
+            pose_state = torch.load(pose_encoder_pt,map_location="cpu")
             pose_net.load_state_dict(pose_state)
             del pose_state
             gc.collect()
