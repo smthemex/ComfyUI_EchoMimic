@@ -339,14 +339,14 @@ def process_video(face_img, uploaded_audio, width, height, length, seed, facemas
     
     
     if visualizer:
-        if pose_dir == "none":  # motion sync
+        if pose_dir in ["pose_01","pose_02","pose_03","pose_04","pose_fight","pose_good","pose_salute","pose_ultraman"]:  # motion sync
             if isinstance(video_images,torch.Tensor):
                 print("**** Use  video pose drive video! ****")
                 pose_dir_path,video_len = motion_sync_main(visualizer, width, height, video_images, face_img,facecrop_dilation_ratio,
                                                           audio_file_prefix)
             else:
-                raise ("**** You need link video_images for drive video  ****")
-                #pose_dir = os.path.join(cur_path, "assets", "test_pose_demo_pose")  # default
+                print ("**** You need link video_images for drive video,but get none ,so use default  pkl driver  ****")
+                pose_dir = os.path.join(cur_path, "assets", "test_pose_demo_pose")  # default
         else:
             print("**** Use  pkl drive video! ****")
             pose_dir_path = os.path.join(tensorrt_lite, pose_dir)
