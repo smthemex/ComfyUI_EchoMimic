@@ -275,7 +275,7 @@ class Echo_LoadModel:
         torch.cuda.empty_cache()
         
         if version == "V1":
-            if infer_mode == "pose_normal" or infer_mode == "pose_acc":
+            if  "pose" in infer_mode :
                 # face locator init
                 face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
                     dtype=weight_dtype, device=device)
@@ -381,7 +381,7 @@ class Echo_LoadModel:
                     face_locator=face_locator,
                     scheduler=scheduler,
                 ).to(dtype=weight_dtype)
-            else:
+            else: #audio_drived_acc
                 pipe = Audio2VideoACCPipeline(
                     vae=vae,
                     reference_unet=reference_unet,
