@@ -2,7 +2,7 @@
 name = "comfyui_echomimic"
 description = "ou can using EchoMimic in comfyui,please using pip install install miss module"
 version = "1.1.0"
-license = "LICENSE"
+license = { file = "LICENSE" }
 dependencies = ["ffmpeg-python", "mediapipe", "moviepy", "IPython", "av","omegaconf","ultralytics","opencv-python","lpips","torchmetrics","torchtyping","tqdm","torch","torchvision","torchaudio","transformers","diffusers","einops"]
 
 [project.urls]
