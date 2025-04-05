@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torchaudio
 import gc
+from safetensors.torch import load_file
 from diffusers import AutoencoderKL, DDIMScheduler
 from omegaconf import OmegaConf
 from .src.models.unet_2d_condition import UNet2DConditionModel
@@ -92,7 +93,7 @@ class Echo_LoadModel:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "vae": ("STRING", {"default": "stabilityai/sd-vae-ft-mse"}),
+                "vae": (folder_paths.get_filename_list("vae"),),
                 "denoising": ("BOOLEAN", {"default": True},),
                 "infer_mode": (["audio_drived", "audio_drived_acc", "pose_normal_dwpose","pose_normal_sapiens", "pose_acc"],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
@@ -112,23 +113,14 @@ class Echo_LoadModel:
         ############# model_init started #############
         
         ## vae init  #using local vae first
-        try:
-            vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device,dtype=weight_dtype)  # using local vae first
-        except:
-            try:
-                vae = AutoencoderKL.from_pretrained(vae).to(device, dtype=weight_dtype) #use input
-            except:
-                try:
-                    # try downlaod model ,and load local vae
-                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
-                                     pt_name="diffusion_pytorch_model.safetensors")
-                    download_weights(weigths_vae_current_path, "stabilityai/sd-vae-ft-mse", subfolder="",
-                                     pt_name="config.json")
-                    vae = AutoencoderKL.from_pretrained(weigths_vae_current_path).to(device, dtype=weight_dtype)
-                except:
-                    # if no model path,use default.
-                    vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device, dtype=weight_dtype)
-              
+        vae_state_dict=load_file(folder_paths.get_full_path("vae", vae))
+        vae_config = AutoencoderKL.load_config(os.path.join(current_path, "configs/config.json"))
+        vae = AutoencoderKL.from_config(vae_config).to(device, weight_dtype)
+        vae.load_state_dict(vae_state_dict, strict=False)
+        del vae_state_dict
+        gc.collect()
+        torch.cuda.empty_cache()
+        
         ## reference net init
         #pretrained_base_model_path = get_instance_path(weigths_current_path)
         
