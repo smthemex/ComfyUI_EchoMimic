@@ -1,0 +1,384 @@
+{
+  "last_node_id": 32,
+  "last_link_id": 31,
+  "nodes": [
+    {
+      "id": 32,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        4207.5400390625,
+        -455.1753845214844
+      ],
+      "size": [
+        315,
+        615
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 29,
+          "shape": 7
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 30,
+          "shape": 7
+        },
+        {
+          "name": "meta_batch",
+          "type": "VHS_BatchManager",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "link": 31,
+          "widget": {
+            "name": "frame_rate"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 8,
+        "loop_count": 0,
+        "filename_prefix": "AnimateDiff",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 19,
+        "save_metadata": true,
+        "pingpong": false,
+        "save_output": true,
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "AnimateDiff_00002-audio.mp4",
+            "subfolder": "",
+            "type": "output",
+            "format": "video/h264-mp4",
+            "frame_rate": 25
+          }
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "LoadImage",
+      "pos": [
+        3084.09326171875,
+        -481.6650390625
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            27
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "1 (1).jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 29,
+      "type": "Echo_Sampler",
+      "pos": [
+        3838.5751953125,
+        -465.1090087890625
+      ],
+      "size": [
+        315,
+        494
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 27
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 28
+        },
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "link": 24
+        },
+        {
+          "name": "face_detector",
+          "type": "MODEL_FACE_E",
+          "link": 25
+        },
+        {
+          "name": "visualizer",
+          "type": "MODEL_VISUAL_E",
+          "link": 26,
+          "shape": 7
+        },
+        {
+          "name": "video_images",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            29
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            30
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "links": [
+            31
+          ],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Sampler"
+      },
+      "widgets_values": [
+        "pose_01",
+        759138363,
+        "randomize",
+        2.5,
+        30,
+        25,
+        16000,
+        0.1,
+        0.8,
+        12,
+        3,
+        120,
+        512,
+        512,
+        false
+      ]
+    },
+    {
+      "id": 31,
+      "type": "LoadAudio",
+      "pos": [
+        3445.849853515625,
+        -451.0820617675781
+      ],
+      "size": [
+        315,
+        124
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            28
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "1.wav",
+        null,
+        ""
+      ]
+    },
+    {
+      "id": 28,
+      "type": "Echo_LoadModel",
+      "pos": [
+        3439.758544921875,
+        -265.0497131347656
+      ],
+      "size": [
+        315,
+        242
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "links": [
+            24
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "face_detector",
+          "type": "MODEL_FACE_E",
+          "links": [
+            25
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "visualizer",
+          "type": "MODEL_VISUAL_E",
+          "links": [
+            26
+          ],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_LoadModel"
+      },
+      "widgets_values": [
+        "sd-vae-ft-mse.safetensors",
+        true,
+        "audio_drived",
+        false,
+        false,
+        false,
+        "V1"
+      ]
+    }
+  ],
+  "links": [
+    [
+      24,
+      28,
+      0,
+      29,
+      2,
+      "MODEL_PIPE_E"
+    ],
+    [
+      25,
+      28,
+      1,
+      29,
+      3,
+      "MODEL_FACE_E"
+    ],
+    [
+      26,
+      28,
+      2,
+      29,
+      4,
+      "MODEL_VISUAL_E"
+    ],
+    [
+      27,
+      30,
+      0,
+      29,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      31,
+      0,
+      29,
+      1,
+      "AUDIO"
+    ],
+    [
+      29,
+      29,
+      0,
+      32,
+      0,
+      "IMAGE"
+    ],
+    [
+      30,
+      29,
+      1,
+      32,
+      1,
+      "AUDIO"
+    ],
+    [
+      31,
+      29,
+      2,
+      32,
+      4,
+      "FLOAT"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9297562455242042,
+      "offset": [
+        -2831.018798828125,
+        667.446891177017
+      ]
+    }
+  },
+  "version": 0.4
+}
