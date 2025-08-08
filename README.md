@@ -1,13 +1,14 @@
 # ComfyUI_EchoMimic
-You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui
+You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.   
+[Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning       
+[Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation   
+[Echomimic_v3](https://github.com/antgroup/echomimic_v3)：1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation   
 
-[Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
-[Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
-[Echomimic_v3](https://github.com/antgroup/echomimic_v3)：1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation
+
 ---
 
 # New Updates 
-* v3 will coming soon
+* v3 will coming soon,OK ,need huge VRAM too
 
 # 1. Installation
 
@@ -30,19 +31,9 @@ If use v1 version 如果要使用V1版本：
 pip install --no-deps facenet-pytorch 
 
 ```
-* 因为V1版本才需求facenet-pytorch，所以不使用V1版是不需要安装facenet-pytorch的，如果安装facenet-pytorch后comfyUI崩了，可以先卸载torch，然后再重新安装，以下版本只是示例：
-* if comfyUI  broken after pip  install  facenet-pytorch ,try this below: 
+If use v3 version 如果要使用V3版本： 
 ```
-pip uninstall torchaudio torchvision torch xformers
-pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-pip install xformers
-```
-* 如果使用的是便携包版本在python_embeded目录下 打开CMD ;   
-* If it is a  portable package comfyUI： open CMD in python_embeded dir   
-```
-python -m pip uninstall torchaudio torchvision torch xformers
-python -m pip install torch torchvision torchaudio --index-url  https://download.pytorch.org/whl/cu124
-python -m pip install xformers
+pip install retinaface --no-deps 
 ```
 
 * 如果ffmpeg 报错，if ffmpeg error：  
@@ -54,25 +45,6 @@ pip install ffmpeg-python
 * 其他库缺啥装啥。。。  
 * If the module is missing, , pip install  missing module.       
 
-## Troubleshooting errors with stable-audio-tools / other audio issues
-**If using conda & python >3.12**
-> Uninstall all & downgrade python
-```
-pip uninstall torchaudio torchvision torch xformers ffmpeg
-
-conda uninstall python
-conda install python=3.11.9
-
-pip install --upgrade pip wheel
-conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=11.8 -c pytorch -c nvidia
-or install torch 2.4 
-conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
-```
-**Should have most of these packages if you install the custom nodes from git urls**
-```
-pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbytes omegaconf decord carvekit insightface easydict open_clip ffmpeg-python taming onnxruntime
-```
----
 
 # 3. Models Required 
 ----
@@ -93,7 +65,7 @@ pip install flash-attn spandrel opencv-python diffusers jwt diffusers bitsandbyt
 |             ├── diffusion_pytorch_model.safetensors or rename sd-vae-ft-mse.safetensors
 ```
 
-**3.2 V1 models V1使用以下模型**:   
+**3.2 V1 models V1使用以下模型**:     
 * V1 address   [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
 * Audio-Drived Algo Inference 音频驱动        
 ```
@@ -141,10 +113,36 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 |         ├── sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2  or/或者 sapiens_1b_goliath_best_goliath_AP_639_torchscript_fp16.pt2
 ```
 
----
+**3.3 v3 version**   
+3.3.1 from [alibaba-pai/Wan2.1-Fun-1.3B-InP ](https://huggingface.co/alibaba-pai/Wan2.1-Fun-1.3B-InP/tree/main) downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   
+3.3.2 use comfyui ,clipvison-H and umt5_xxl_fp8_e4m3fn_scaled.safetensors   
+3.3.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)   
+3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   
+```
+├── ComfyUI/models/echo_mimic/transformer 
+|         ├── diffusion_pytorch_model.safetensors #BadToBest/EchoMimicV3
+|         ├── config.json
+├── ComfyUI/models/echo_mimic/wav2vec2-base-960h
+|         ├── all config json files 
+|         ├──  model.safetensors
+├── ComfyUI/models/clip
+|         ├── umt5_xxl_fp8_e4m3fn_scaled.safetensors
+├── ComfyUI/models/clip_vision
+|         ├──clipvison-H
+├── ComfyUI/models/echo_mimic/
+|         ├──diffusion_pytorch_model.safetensors #Wan2.1-Fun-1.3B-InP transformer
+├── ComfyUI/models/vae
+|         ├── Wan2.1_VAE.pth
+```
+
 
 # 4 Example
 -----
+* V3 test
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example.png" width="60%">
+
+
+
 * 自动对齐输入图片Automatically align input images；
 <img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/alignA.png" width="60%">
 <img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example/align.png" width="60%">
@@ -255,6 +253,16 @@ EchoMimici-V2
   eprint={2411.10061},
   archivePrefix={arXiv},
   primaryClass={cs.CV}
+}
+```
+EchoMimici-V3
+```
+@misc{meng2025echomimicv3,
+  title={EchoMimicV3: 1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation},
+  author={Rang Meng, Yan Wang, Weipeng Wu, Ruobing Zheng, Yuming Li, Chenguang Ma},
+  year={2025},
+  eprint={2507.03905},
+  archivePrefix={arXiv}
 }
 ```
 sapiens
