@@ -1,13 +1,13 @@
 # ComfyUI_EchoMimic
-You can use EchoMimic & EchoMimic V2 in comfyui
+You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui
 
 [Echomimic](https://github.com/antgroup/echomimic/tree/main)：Lifelike Audio-Driven Portrait Animations through Editable Landmark Conditioning  
 [Echomimic_v2](https://github.com/antgroup/echomimic_v2): Towards Striking, Simplified, and Semi-Body Human Animation
-
+[Echomimic_v3](https://github.com/antgroup/echomimic_v3)：1.3B Parameters are All You Need for Unified Multi-Modal and Multi-Task Human Animation
 ---
 
 # New Updates 
-* 2024-04-05 use single vae now vae加载改成单体模型
+* v3 will coming soon
 
 # 1. Installation
 
