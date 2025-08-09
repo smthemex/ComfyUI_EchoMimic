@@ -33,7 +33,7 @@ pip install --no-deps facenet-pytorch
 ```
 If use v3 version 如果要使用V3版本： 
 ```
-pip install retinaface --no-deps 
+pip install retina-face==0.0.17
 ```
 
 * 如果ffmpeg 报错，if ffmpeg error：  
