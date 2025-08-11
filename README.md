@@ -12,7 +12,7 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 
 # 1. Installation
 
-In the ./ComfyUI /custom_node directory, run the following:   
+In the ./ComfyUI /custom_nodes directory, run the following:   
 ```
 git clone https://github.com/smthemex/ComfyUI_EchoMimic.git
 ```
@@ -114,8 +114,8 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 ```
 
 **3.3 v3 version**   
-3.3.1 from [alibaba-pai/Wan2.1-Fun-1.3B-InP ](https://huggingface.co/alibaba-pai/Wan2.1-Fun-1.3B-InP/tree/main) downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   
-3.3.2 use comfyui ,clipvison-H and umt5_xxl_fp8_e4m3fn_scaled.safetensors   
+3.3.1 from [Wan2.1-Fun-V1.1-1.3B-InP](https://huggingface.co/alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP/tree/main)downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   
+3.3.2 use comfyui ,[clipvison-h](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/clip_vision) and [umt5_xxl_fp8_e4m3fn_scaled.safetensors ](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/text_encoders)  
 3.3.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)   
 3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   
 ```
@@ -128,9 +128,9 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 ├── ComfyUI/models/clip
 |         ├── umt5_xxl_fp8_e4m3fn_scaled.safetensors
 ├── ComfyUI/models/clip_vision
-|         ├──clipvison-H
+|         ├──clipvison-h # 1.26G
 ├── ComfyUI/models/echo_mimic/
-|         ├──diffusion_pytorch_model.safetensors #Wan2.1-Fun-1.3B-InP transformer
+|         ├──diffusion_pytorch_model.safetensors #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G
 ├── ComfyUI/models/vae
 |         ├── Wan2.1_VAE.pth
 ```
