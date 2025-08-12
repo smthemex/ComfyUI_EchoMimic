@@ -38,8 +38,8 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
         vae,
         reference_unet,
         denoising_unet,
-        audio_guider,
-        pose_encoder,
+        # audio_guider,
+        # pose_encoder,
         scheduler: Union[
             DDIMScheduler,
             PNDMScheduler,
@@ -58,8 +58,8 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
             vae=vae,
             reference_unet=reference_unet,
             denoising_unet=denoising_unet,
-            audio_guider=audio_guider,
-            pose_encoder=pose_encoder,
+            # audio_guider=audio_guider,
+            # pose_encoder=pose_encoder,
             scheduler=scheduler,
             image_proj_model=image_proj_model,
             tokenizer=tokenizer,
@@ -302,8 +302,8 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
     def __call__(
         self,
         ref_image,
-        audio_path,
-        poses_tensor,
+        #audio_path,
+        pose_enocder_tensor,
         width,
         height,
         video_length,
@@ -326,6 +326,7 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
         fps=25,
         audio_margin=2,
         start_idx=0,
+        whisper_chunks=None,
         **kwargs,
     ):
         # Default height and width to unet
@@ -357,8 +358,8 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
             fusion_blocks="full",
         )
 
-        whisper_feature = self.audio_guider.audio2feat(audio_path)
-        whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
+        # whisper_feature = self.audio_guider.audio2feat(audio_path)
+        # whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
         audio_frame_num = whisper_chunks.shape[0]
         audio_fea_final = torch.Tensor(whisper_chunks).to(dtype=self.vae.dtype, device=self.vae.device)
         audio_fea_final = audio_fea_final.unsqueeze(0)
@@ -378,7 +379,7 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
             context_frames
         )
         
-        pose_enocder_tensor = self.pose_encoder(poses_tensor)
+        #pose_enocder_tensor = self.pose_encoder(poses_tensor)
         
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 

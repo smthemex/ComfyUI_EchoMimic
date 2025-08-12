@@ -49,8 +49,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
         vae,
         reference_unet,
         denoising_unet,
-        audio_guider,
-        face_locator,
+        # audio_guider,
+        # face_locator,
         scheduler: Union[
             DDIMScheduler,
             PNDMScheduler,
@@ -69,8 +69,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
             vae=vae,
             reference_unet=reference_unet,
             denoising_unet=denoising_unet,
-            audio_guider=audio_guider,
-            face_locator=face_locator,
+            # audio_guider=audio_guider,
+            # face_locator=face_locator,
             scheduler=scheduler,
             image_proj_model=image_proj_model,
             tokenizer=tokenizer,
@@ -339,8 +339,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
     def __call__(
         self,
         ref_image,
-        audio_path,
-        face_mask_tensor,
+        #audio_path,
+        c_face_locator_tensor,
         width,
         height,
         video_length,
@@ -362,6 +362,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
         audio_sample_rate=16000,
         fps=25,
         audio_margin=2,
+        whisper_chunks=None,
         **kwargs,
     ):
         # Default height and width to unet
@@ -393,9 +394,9 @@ class Audio2VideoPipeline(DiffusionPipeline):
             fusion_blocks="full",
         )
 
-        whisper_feature = self.audio_guider.audio2feat(audio_path)
+        # whisper_feature = self.audio_guider.audio2feat(audio_path)
 
-        whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
+        # whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
 
         print("whisper_chunks:", whisper_chunks.shape)
         audio_frame_num = whisper_chunks.shape[0]
@@ -418,7 +419,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
             generator
         )
         # print(video_length, latents.shape)
-        c_face_locator_tensor = self.face_locator(face_mask_tensor)
+        #c_face_locator_tensor = self.face_locator(face_mask_tensor)
+
         uc_face_locator_tensor = torch.zeros_like(c_face_locator_tensor)
         face_locator_tensor = torch.cat([uc_face_locator_tensor, c_face_locator_tensor], dim=0)
         # Prepare extra step kwargs.
@@ -449,7 +451,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
             )
         )
         print("ref_image_latents shape:", ref_image_latents.shape)
-        print("face_mask_tensor shape:", face_mask_tensor.shape)
+       
         print("face_locator_tensor shape:", face_locator_tensor.shape)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for t_i, t in enumerate(timesteps):
