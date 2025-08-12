@@ -94,7 +94,7 @@ class Echo_LoadModel:
     
     def main_loader(self, vae, denoising, infer_mode,  lowvram,teacache_offload,use_mmgp, version):
         
-        config_v3,audio_pt,face_locator_pt,pose_encoder_pt=None,None,None,None
+        config_v3,audio_pt,face_locator_pt,pose_encoder_pt,tokenizer,temporal_compression_ratio=None,None,None,None,None,None
         if "V1"==version :
             model, audio_pt, face_locator_pt= Echo_v1_load_model(vae,weigths_current_path,version, infer_mode, denoising, current_path, device,lowvram)
         elif "V2"==version :
@@ -180,16 +180,16 @@ class Echo_Predata:
             emb = Echo_v1_predata(face_img,audio_file,fps,info.get("audio_pt"),info.get("face_locator_pt"),device,info.get("infer_mode"),draw_mouse,motion_sync_,lowvram,
                     width,height,facemask_ratio,facecrop_ratio,video_images,audio_file_prefix,current_path,tensorrt_lite,length,pose_dir)
         elif "V2"==version :
-            emb = Echo_v2_predata(face_img,audio_file,height,width,info.get("pose_encoder_pt"),info.get("audio_pt"),current_path,video_images,tensorrt_lite,device,fps,length,info.get("infer_mode"),weigths_current_path)
+            emb = Echo_v2_predata(face_img,audio_file,height,width,info.get("pose_encoder_pt"),info.get("audio_pt"),
+                                  current_path,video_images,tensorrt_lite,device,fps,length,info.get("infer_mode"),weigths_current_path,pose_dir)
         else:#v3
             config=info.get("config")
             config.fps=fps
             config.partial_video_length=int(partial_video_length)
-            config.enable_teacache=lowvram
             emb= Echo_v3_predata(image_encoder,text_encoder,info.get("tokenizer"),face_img,audio_file,ip_mask_path,config,device,info.get("temporal_compression_ratio"),prompt,negative_prompt,weigths_current_path,current_path,length)
             emb["config"]=config
         emb.update(info)
-        emb.update({"audio_file_prefix":audio_file_prefix,"fps":fps})
+        emb.update({"audio_file_prefix":audio_file_prefix,"fps":fps,"height":height,"width":width})
 
         return (emb,)
 
@@ -221,9 +221,11 @@ class Echo_Sampler:
         lowvram = emb.get("lowvram")
 
         if version=="V1":
+            model.to(device)
             output_video = process_video(emb.get("ref_image_pil"), emb.get("audio_path"), emb.get("width"), emb.get("height"), emb.get("length"), seed, emb.get("face_locator_tensor"),
                                          context_frames, context_overlap, cfg, steps, sample_rate, emb.get("fps"), model,save_video,emb.get("mask_len"), emb.get("audio_file_prefix"),emb.get("whisper_chunks"))
         elif version=="V2":
+            model.to(device)
             output_video=process_video_v2(emb.get("infer_image_pil"),emb.get("ref_image_pil"), emb.get("audio_path"),emb.get("face_locator_tensor"), emb.get("W_change"), emb.get("H_change"), emb.get("start_idx"), seed,
                    context_frames, context_overlap, cfg, steps, sample_rate, emb.get("fps"), model,emb.get("mask_len"),emb.get("height"),emb.get("width"),
                   save_video,  emb.get("audio_file_prefix"),emb.get("LEN"),emb.get("whisper_chunks") )    
