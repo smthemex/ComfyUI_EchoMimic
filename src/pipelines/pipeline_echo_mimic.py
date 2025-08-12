@@ -338,7 +338,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
     def __call__(
         self,
         ref_image,
-        #audio_path,
+        # audio_path,
         c_face_locator_tensor,
         width,
         height,
@@ -365,8 +365,8 @@ class Audio2VideoPipeline(DiffusionPipeline):
         **kwargs,
     ):
         # Default height and width to unet
-        height = height or self.unet.config.sample_size * self.vae_scale_factor
-        width = width or self.unet.config.sample_size * self.vae_scale_factor
+        # height = height or self.unet.config.sample_size * self.vae_scale_factor
+        # width = width or self.unet.config.sample_size * self.vae_scale_factor
 
         device = self._execution_device
 
@@ -395,7 +395,7 @@ class Audio2VideoPipeline(DiffusionPipeline):
         # whisper_feature = self.audio_guider.audio2feat(audio_path)
         # whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
 
-        print("whisper_chunks:", whisper_chunks.shape)
+        #print("whisper_chunks:", whisper_chunks.shape)
         audio_frame_num = whisper_chunks.shape[0]
         audio_fea_final = torch.Tensor(whisper_chunks).to(dtype=self.vae.dtype, device=self.vae.device)
         audio_fea_final = audio_fea_final.unsqueeze(0)
