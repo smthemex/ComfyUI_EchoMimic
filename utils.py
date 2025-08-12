@@ -51,11 +51,11 @@ def process_video_v2(infer_image_pil,ref_image_pil, uploaded_audio,face_locator_
         infer_image_pil,
         #uploaded_audio,
         face_locator_tensor,
-        W_change,
-        H_change,
-        L,
-        steps,
-        cfg,
+        width=W_change,
+        height=H_change,
+        video_length=L,
+        num_inference_steps=steps,
+        guidance_scale=cfg,
         generator=generator,
         audio_sample_rate=sample_rate,
         context_frames=context_frames,
@@ -90,7 +90,8 @@ def process_video_v2(infer_image_pil,ref_image_pil, uploaded_audio,face_locator_
     return ouput_list
 
 
-def process_video(ref_image_pil, uploaded_audio, width, height, length, seed, face_locator_tensor,context_frames, context_overlap, cfg, steps, sample_rate, fps, pipe,save_video,mask_len, audio_file_prefix,whisper_chunks):
+def process_video(ref_image_pil, uploaded_audio, width, height, length, seed, face_locator_tensor,context_frames, context_overlap, cfg, steps, 
+                  sample_rate, fps, pipe,save_video,mask_len, audio_file_prefix,whisper_chunks):
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
     else:
@@ -99,12 +100,12 @@ def process_video(ref_image_pil, uploaded_audio, width, height, length, seed, fa
     video = pipe(
         ref_image_pil,
         #uploaded_audio,
-        face_locator_tensor,
-        width,
-        height,
-        length,
-        steps,
-        cfg,
+        c_face_locator_tensor=face_locator_tensor,
+        width=width,
+        height=height,
+        video_length=length,
+        num_inference_steps=steps,
+        guidance_scale=cfg,
         generator=generator,
         audio_sample_rate=sample_rate,
         context_frames=context_frames,
