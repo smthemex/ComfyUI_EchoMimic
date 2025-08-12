@@ -1,0 +1,495 @@
+{
+  "id": "52c52992-a3bc-4b4a-b2bf-485b64102a51",
+  "revision": 0,
+  "last_node_id": 23,
+  "last_link_id": 48,
+  "nodes": [
+    {
+      "id": 21,
+      "type": "Echo_Sampler",
+      "pos": [
+        8043.2548828125,
+        -335.8991394042969
+      ],
+      "size": [
+        270,
+        246
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "link": 31
+        },
+        {
+          "name": "emb",
+          "type": "MODEL_EMB_E",
+          "link": 43
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            33
+          ]
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "links": [
+            34
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Sampler"
+      },
+      "widgets_values": [
+        638506672,
+        "randomize",
+        2.5,
+        20,
+        16000,
+        12,
+        3,
+        false
+      ]
+    },
+    {
+      "id": 9,
+      "type": "LoadAudio",
+      "pos": [
+        7251.185546875,
+        -66.02975463867188
+      ],
+      "size": [
+        270,
+        136
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            42,
+            47
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "demo_ch_woman_04.WAV",
+        null,
+        null
+      ]
+    },
+    {
+      "id": 10,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        8349.4658203125,
+        -315.58013916015625
+      ],
+      "size": [
+        270,
+        574
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 33
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 42
+        },
+        {
+          "name": "meta_batch",
+          "shape": 7,
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "link": 34
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 8,
+        "loop_count": 0,
+        "filename_prefix": "AnimateDiff",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 19,
+        "save_metadata": true,
+        "pingpong": false,
+        "save_output": true,
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "AnimateDiff_00012-audio.mp4",
+            "subfolder": "",
+            "type": "output",
+            "format": "video/h264-mp4",
+            "frame_rate": 25
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [
+        7261.24462890625,
+        128.91090393066406
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "cpu"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        7250.68310546875,
+        -426.81036376953125
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            45
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "demo_ch_woman_04.png",
+        "image"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "CLIPVisionLoader",
+      "pos": [
+        7254.42529296875,
+        304.97845458984375
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP_VISION",
+          "type": "CLIP_VISION",
+          "links": [
+            48
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPVisionLoader"
+      },
+      "widgets_values": [
+        "clip_vision_h_wan.safetensors"
+      ]
+    },
+    {
+      "id": 20,
+      "type": "Echo_LoadModel",
+      "pos": [
+        7687.85498046875,
+        -354.1556091308594
+      ],
+      "size": [
+        270,
+        222
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "info",
+          "type": "MODEL_INFO_E",
+          "links": [
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_LoadModel"
+      },
+      "widgets_values": [
+        "sd-vae-ft-mse.safetensors",
+        true,
+        "pose_normal_sapiens",
+        false,
+        "V3",
+        "HighRAM_LowVRAM",
+        "V2"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "Echo_Predata",
+      "pos": [
+        7593.890625,
+        -38.637229919433594
+      ],
+      "size": [
+        296.19342041015625,
+        540.9140625
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "info",
+          "type": "MODEL_INFO_E",
+          "link": 44
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 45
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 47
+        },
+        {
+          "name": "clip",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 46
+        },
+        {
+          "name": "clip_vision",
+          "shape": 7,
+          "type": "CLIP_VISION",
+          "link": 48
+        },
+        {
+          "name": "video_images",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "emb",
+          "type": "MODEL_EMB_E",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Predata"
+      },
+      "widgets_values": [
+        " Gesture, Body, Face Expressions and Movements: Hands and Fingers Movements: The person's hands are not visible in the image, so there are no specific hand or finger movements to describe. Body Positions and Posture: The person is standing upright with a straight posture. Body Coverage in Frame: The person is fully visible from the waist up. Face Expressions Change: The person appears to have a neutral expression with a slight smile. Eyes Movement: The eyes are looking directly at the camera. Head Movement: The head is slightly tilted forward.  Overall Description: The character is standing in a front-facing shot, wearing a pink knitted vest over a white collared shirt and a white pleated skirt. The background appears to be a studio setting with soft lighting and some blurred elements that suggest a modern, clean environment. The person is adorned with pearl earrings, adding a touch of elegance to their appearance. The overall impression is one of a professional or casual presentation, possibly for a broadcast or a photoshoot.",
+        " Gesture is bad. Gesture is unclear. Strange and twisted hands. Bad hands. Bad fingers. Unclear and blurry hands. 手部快速摆动, 手指频繁抽搐, 夸张手势, 重复机械性动作.",
+        "pose_01",
+        384,
+        576,
+        25,
+        0.1,
+        0.8,
+        251,
+        65,
+        false,
+        false
+      ]
+    }
+  ],
+  "links": [
+    [
+      31,
+      20,
+      0,
+      21,
+      0,
+      "MODEL_PIPE_E"
+    ],
+    [
+      33,
+      21,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      34,
+      21,
+      1,
+      10,
+      4,
+      "FLOAT"
+    ],
+    [
+      42,
+      9,
+      0,
+      10,
+      1,
+      "AUDIO"
+    ],
+    [
+      43,
+      23,
+      0,
+      21,
+      1,
+      "MODEL_EMB_E"
+    ],
+    [
+      44,
+      20,
+      1,
+      23,
+      0,
+      "MODEL_INFO_E"
+    ],
+    [
+      45,
+      8,
+      0,
+      23,
+      1,
+      "IMAGE"
+    ],
+    [
+      46,
+      5,
+      0,
+      23,
+      3,
+      "CLIP"
+    ],
+    [
+      47,
+      9,
+      0,
+      23,
+      2,
+      "AUDIO"
+    ],
+    [
+      48,
+      15,
+      0,
+      23,
+      4,
+      "CLIP_VISION"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8954302432552457,
+      "offset": [
+        -7030.734216037518,
+        474.31767471108896
+      ]
+    },
+    "frontendVersion": "1.24.4"
+  },
+  "version": 0.4
+}
