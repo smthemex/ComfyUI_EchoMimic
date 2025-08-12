@@ -120,7 +120,7 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   
 ```
 ├── ComfyUI/models/echo_mimic/transformer 
-|         ├── diffusion_pytorch_model.safetensors #BadToBest/EchoMimicV3
+|         ├── diffusion_pytorch_model.safetensors  #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G
 |         ├── config.json
 ├── ComfyUI/models/echo_mimic/wav2vec2-base-960h
 |         ├── all config json files 
@@ -130,7 +130,7 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 ├── ComfyUI/models/clip_vision
 |         ├──clipvison-h # 1.26G
 ├── ComfyUI/models/echo_mimic/
-|         ├──diffusion_pytorch_model.safetensors #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G
+|         ├──diffusion_pytorch_model.safetensors  ##BadToBest/EchoMimicV3
 ├── ComfyUI/models/vae
 |         ├── Wan2.1_VAE.pth
 ```
