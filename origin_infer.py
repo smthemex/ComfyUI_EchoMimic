@@ -182,29 +182,6 @@ def Echo_v1_load_model(vae_path,weigths_current_path,version, infer_mode,denoisi
     del denoising_state
     gc_clear()
 
-
-    # if  "pose" in infer_mode :
-    #     # face locator init
-    #     face_locator = FaceLocator(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(
-    #         dtype=weight_dtype, device=device)
-    #     face_locator.load_state_dict(torch.load(face_locator_pt), strict=False)
-    #     if motion_sync:
-    #         visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=True, draw_eye=True, draw_nose=True,
-    #                                         draw_eyebrow=True, draw_pupil=True)
-    #     else:
-    #         visualizer = FaceMeshVisualizer(draw_iris=False, draw_mouse=draw_mouse)
-    # else:
-    #     # face locator init
-    #     face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(
-    #         dtype=weight_dtype, device=device)
-    #     face_locator.load_state_dict(torch.load(face_locator_pt), strict=False)
-    #     visualizer = None
-
-    ## load audio processor params
-    # audio_processor = load_audio_model(model_path=audio_pt, device=device)
-    
-    # face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709,
-    #                         post_process=True, device=device)
     sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
     scheduler = DDIMScheduler(**sched_kwargs)
 
@@ -292,50 +269,7 @@ def Echo_v2_load_model(vae_path,weigths_current_path, version, infer_mode,curren
     del denoising_state
     gc_clear()
 
-    # pose_net = PoseEncoder(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(device=device,
-    #             dtype=weight_dtype)
-    # pose_state = torch.load(pose_encoder_pt,map_location="cpu")
-    # pose_net.load_state_dict(pose_state)
-    # del pose_state
-    # gc_clear()
-
-    # if infer_mode == "pose_normal_dwpose":
-    #     print("using DWpose drive pose")
-    #     from .echomimic_v2.src.models.dwpose.dwpose_detector import DWposeDetector
-    #     dw_ll=download_weights(weigths_current_path, "yzd-v/DWPose", subfolder="",
-    #                         pt_name="dw-ll_ucoco_384.onnx")
-    #     yolox_l = download_weights(weigths_current_path, "yzd-v/DWPose", subfolder="",
-    #                                 pt_name="yolox_l.onnx")
-    #     visualizer = DWposeDetector(model_det=yolox_l,model_pose=dw_ll,device=device)
-        
-    # elif infer_mode == "pose_normal_sapiens":
-    #     print("using Sapiens drive pose")
-    #     from .src.pose import SapiensPoseEstimation
-    #     pose_dir_32 = os.path.join(weigths_current_path,
-    #                                 "sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2")
-    #     pose_dir_bf16 = os.path.join(weigths_current_path,
-    #                                     "sapiens_1b_goliath_best_goliath_AP_639_torchscript_bf16.pt2")
-    #     dtype = torch.float32
-    #     if os.path.exists(pose_dir_bf16):
-    #         dtype = torch.float16
-    #         pose_dir = pose_dir_bf16
-    #     else:
-    #         if os.path.exists(pose_dir_32):
-    #             pose_dir = pose_dir_32
-    #         else:
-    #             pose_dir = ""
-    #     visualizer = SapiensPoseEstimation(local_pose=pose_dir, model_dir=weigths_current_path, dtype=dtype)
-    # else:
-    #     visualizer = None
-
-    ## load audio processor params
-    # audio_processor = load_audio_model(model_path=audio_pt, device=device)
-    # if infer_mode == "pose_normal_dwpose":
-    #     face_detector ="dwpose"
-    # elif infer_mode == "pose_normal_sapiens":
-    #     face_detector = "sapiens"
-    # else:
-    #     face_detector = None
+ 
     sched_kwargs = OmegaConf.to_container(infer_config_v2.noise_scheduler_kwargs)
     scheduler = DDIMScheduler(**sched_kwargs)
     vae=load_vae(vae_path,device,current_path)
@@ -496,7 +430,7 @@ def Echo_v1_predata(face_img,audio_path,fps,audio_pt,face_locator_pt,device,infe
 
 
 
-def Echo_v2_predata(ref_image_pil,uploaded_audio,height,width,pose_encoder_pt,audio_pt,cur_path,video_images,tensorrt_lite,device,fps,length,infer_mode,weigths_current_path):
+def Echo_v2_predata(ref_image_pil,uploaded_audio,height,width,pose_encoder_pt,audio_pt,cur_path,video_images,tensorrt_lite,device,fps,length,infer_mode,weigths_current_path,pose_dir):
     from .echomimic_v2.src.models.pose_encoder import PoseEncoder
 
     pose_net = PoseEncoder(320, conditioning_channels=3, block_out_channels=(16, 32, 96, 256)).to(device=device,
@@ -738,10 +672,10 @@ def Echo_v2_predata(ref_image_pil,uploaded_audio,height,width,pose_encoder_pt,au
         pose_list.append(
             torch.Tensor(np.array(tgt_musk_pil)).to(dtype=weight_dtype, device=device).permute(2, 0, 1) / 255.0)
     
-    poses_tensor = torch.stack(pose_list, dim=1).unsqueeze(0)
-    print(f"poses_tensor:{poses_tensor.shape}")
+    poses_tensor = torch.stack(pose_list, dim=1).unsqueeze(0).to(device)
+    #print(f"poses_tensor:{poses_tensor.shape}")
     mask_len=poses_tensor.shape[2]
-    face_locator_tensor=pose_net(poses_tensor[:, :, :L, ...])
+    face_locator_tensor=pose_net(poses_tensor[:, :, :L, ...]).to(device)
    
     emb ={"whisper_chunks":whisper_chunks,"infer_image_pil":infer_image_pil,"LEN":L,"mask_len":mask_len,"start_idx":start_idx,"face_locator_tensor": face_locator_tensor,"ref_image_pil":ref_image_pil,"H_change":height,"W_change":width}
 
