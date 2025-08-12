@@ -8,7 +8,9 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 ---
 
 # New Updates 
-* v3 will coming soon,OK ,need huge VRAM too
+* V3正式上线，测试环境12G VRAM，OOM需要减少视频分块(partial_video_length)的数值，12G可以跑65，16可以试试97，更高可以试试113
+* V3 is Done,you can try it now.. need 8G and more (use mmgp,LOW LOW,partial_video_length==65 or 33)
+* 因为同步修改了一些降低占用的代码，V2 和V1可能会报错，暂时未测试
 
 # 1. Installation
 
@@ -33,7 +35,8 @@ pip install --no-deps facenet-pytorch
 ```
 If use v3 version 如果要使用V3版本： 
 ```
-pip install retina-face==0.0.17
+pip install retina-face==0.0.17 #使用须外网下载模型，待处理
+pip install mmgp # optional 可选
 ```
 
 * 如果ffmpeg 报错，if ffmpeg error：  
@@ -120,7 +123,7 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   
 ```
 ├── ComfyUI/models/echo_mimic/transformer 
-|         ├── diffusion_pytorch_model.safetensors  #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G
+|         ├── diffusion_pytorch_model.safetensors  #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。
 |         ├── config.json
 ├── ComfyUI/models/echo_mimic/wav2vec2-base-960h
 |         ├── all config json files 
@@ -138,8 +141,8 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 
 # 4 Example
 -----
-* V3 test
-<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example.png" width="60%">
+* V3 version
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v3.png" width="60%">
 
 
 
