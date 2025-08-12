@@ -1,9 +1,9 @@
 [project]
-name = "comfyui_echomimic"
-description = "ou can using EchoMimic in comfyui,please using pip install install miss module"
-version = "1.1.0"
+name = "echomimic"
+description = "you can using EchoMimic v1,v2,v3 version in comfyui,please using pip install install miss module"
+version = "3.0.0"
 license = { file = "LICENSE" }
-dependencies = ["ffmpeg-python", "mediapipe", "moviepy", "IPython", "av","omegaconf","ultralytics","opencv-python","lpips","torchmetrics","torchtyping","tqdm","torch","torchvision","torchaudio","transformers","diffusers","einops"]
+dependencies = ["ffmpeg-python", "mediapipe", "moviepy", "IPython", "av","omegaconf","opencv-python","lpips","torchmetrics","torchtyping","tqdm","torch","torchvision","torchaudio","transformers","diffusers","einops"]
 
 [project.urls]
 Repository = "https://github.com/smthemex/ComfyUI_EchoMimic"

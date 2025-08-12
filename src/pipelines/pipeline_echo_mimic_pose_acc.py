@@ -41,8 +41,8 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
         vae,
         reference_unet,
         denoising_unet,
-        audio_guider,
-        face_locator,
+        # audio_guider,
+        # face_locator,
         # audio_feature_mapper,
         scheduler: Union[
             DDIMScheduler,
@@ -62,8 +62,8 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
             vae=vae,
             reference_unet=reference_unet,
             denoising_unet=denoising_unet,
-            audio_guider=audio_guider,
-            face_locator=face_locator,
+            # audio_guider=audio_guider,
+            # face_locator=face_locator,
             scheduler=scheduler,
             image_proj_model=image_proj_model,
             tokenizer=tokenizer,
@@ -378,8 +378,8 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
     def __call__(
         self,
         ref_image,
-        audio_path,
-        face_mask_tensor,
+        #audio_path,
+        face_locator_tensor,
         width,
         height,
         video_length,
@@ -401,6 +401,7 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
         audio_sample_rate=16000,
         fps=25,
         audio_margin=2,
+        whisper_chunks=None,
         **kwargs,
     ):
         # Default height and width to unet
@@ -432,9 +433,9 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
             fusion_blocks="full",
         )
 
-        whisper_feature = self.audio_guider.audio2feat(audio_path)
+        # whisper_feature = self.audio_guider.audio2feat(audio_path)
 
-        whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
+        # whisper_chunks = self.audio_guider.feature2chunks(feature_array=whisper_feature, fps=fps)
 
         audio_frame_num = whisper_chunks.shape[0]
         audio_fea_final = torch.Tensor(whisper_chunks).to(dtype=self.vae.dtype, device=self.vae.device)
@@ -457,7 +458,7 @@ class AudioPose2VideoPipeline(DiffusionPipeline):
             context_frames
         )
         
-        face_locator_tensor = self.face_locator(face_mask_tensor)
+        #face_locator_tensor = self.face_locator(face_mask_tensor)
         
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
