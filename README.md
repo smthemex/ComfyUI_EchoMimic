@@ -8,6 +8,7 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 ---
 
 # New Updates 
+* 修复bug，retina-face 模型改成本地运行
 * V3正式上线，测试环境12G VRAM，OOM需要减少视频分块(partial_video_length)的数值，12G可以跑65，16可以试试97，更高可以试试113
 * V3 is Done,you can try it now.. need 8G and more (use mmgp,LOW LOW,partial_video_length==65 or 33)
 
@@ -35,7 +36,8 @@ pip install --no-deps facenet-pytorch
 If use v3 version 如果要使用V3版本： 
 ```
 pip install retina-face==0.0.17 #使用须外网下载模型，待处理
-pip install mmgp # optional 可选
+pip install mmgp # optional 可选 
+pip install tensorflow==2.15.0   #高版本可能会报错，存疑   
 ```
 
 * 如果ffmpeg 报错，if ffmpeg error：  
@@ -119,10 +121,11 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 3.3.1 from [Wan2.1-Fun-V1.1-1.3B-InP](https://huggingface.co/alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP/tree/main)downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   
 3.3.2 use comfyui ,[clipvison-h](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/clip_vision) and [umt5_xxl_fp8_e4m3fn_scaled.safetensors ](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/text_encoders)  
 3.3.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)   
-3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   
+3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer    
+3.3.5 [retinaface.h5](https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5)  目录下没有一般会自动下载
 ```
 ├── ComfyUI/models/echo_mimic/transformer 
-|         ├── diffusion_pytorch_model.safetensors  #Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。
+|         ├── diffusion_pytorch_model.safetensors  # Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。
 |         ├── config.json
 ├── ComfyUI/models/echo_mimic/wav2vec2-base-960h
 |         ├── all config json files 
@@ -132,9 +135,11 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 ├── ComfyUI/models/clip_vision
 |         ├──clipvison-h # 1.26G
 ├── ComfyUI/models/echo_mimic/
-|         ├──diffusion_pytorch_model.safetensors  ##BadToBest/EchoMimicV3
+|         ├──diffusion_pytorch_model.safetensors  # BadToBest/EchoMimicV3
 ├── ComfyUI/models/vae
 |         ├── Wan2.1_VAE.pth
+├── ComfyUI/models/echo_mimic/.deepface/weights/    #注意.deepface前面有个点，这个是方便不能翻墙玩家
+|         ├──retinaface.h5
 ```
 
 
