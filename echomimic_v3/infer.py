@@ -120,12 +120,13 @@ def load_wav2vec_models(wav2vec_model_dir):
     return processor, model
 
 
-def extract_audio_features(audio_path, processor, model):
+def extract_audio_features(audio_path, processor, model_):
     """Extract audio features using Wav2Vec."""
     sr = 16000
     audio_segment, sample_rate = librosa.load(audio_path, sr=sr)
     input_values = processor(audio_segment, sampling_rate=sample_rate, return_tensors="pt").input_values
-    features = model(input_values).last_hidden_state
+    input_values=input_values.to(model_.device)
+    features = model_(input_values).last_hidden_state
     return features.squeeze(0)
 
 
