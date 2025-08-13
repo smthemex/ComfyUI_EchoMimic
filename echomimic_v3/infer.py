@@ -384,7 +384,13 @@ def Echo_v3_predata(clip_image_encoder,text_encoder,tokenizer,face_img,audio_pat
     if not os.path.exists(ip_mask_path):
         try:
             from .src.face_detect import get_mask_coord
-            y1, y2, x1, x2, h_, w_ = get_mask_coord(face_img)
+            result = get_mask_coord(face_img)
+            if result is None:
+                print("Error: Face detection no face. Use a default mask path.")
+                y1, y2, x1, x2, h_, w_ = np.load(os.path.join(current_path,"echomimic_v3/datasets/echomimicv3_demos/masks/demo_ch_woman_04.npy"))
+            else:
+                print("Done: Face detection is done.")
+                y1, y2, x1, x2, h_, w_=result
         except:
             print("Error: Face detection failed. Use a default mask path.")
             y1, y2, x1, x2, h_, w_ = np.load(os.path.join(current_path,"echomimic_v3/datasets/echomimicv3_demos/masks/demo_ch_woman_04.npy"))
