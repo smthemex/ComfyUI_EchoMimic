@@ -1,8 +1,12 @@
 # pip install retina-face
 # we recommand tensorflow==2.15
 # 
-from retinaface import RetinaFace
+import os
+import folder_paths
 
+os.environ['DEEPFACE_HOME'] = os.path.join(folder_paths.models_dir,"echo_mimic")
+
+from retinaface import RetinaFace
 import sys
 from PIL import Image
 import numpy as np
@@ -15,8 +19,8 @@ def get_mask_coord(img):
     raise ValueError(f"Exception while loading {img}")
 
   height, width, _ = img.shape
-
-  facial_areas = resp = RetinaFace.detect_faces(img) 
+  
+  facial_areas = RetinaFace.detect_faces(img)  
   if len(facial_areas) == 0:
     print ('has no face detected!')
     return None
