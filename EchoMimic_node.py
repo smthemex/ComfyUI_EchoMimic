@@ -47,6 +47,10 @@ weigths_trans_current_path = os.path.join(weigths_current_path, "transformer")
 if not os.path.exists(weigths_trans_current_path):
     os.makedirs(weigths_trans_current_path)
 
+weigths_deepface_current_path = os.path.join(weigths_current_path, ".deepface/weights")
+if not os.path.exists(weigths_deepface_current_path):
+    os.makedirs(weigths_deepface_current_path)
+
 
 
 # ffmpeg
