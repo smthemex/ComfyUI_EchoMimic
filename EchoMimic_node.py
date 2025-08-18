@@ -10,7 +10,7 @@ import gc
 import platform
 import subprocess
 
-from .utils import find_directories,process_video, cf_tensor2cv,process_video_v2,load_images,tensor_to_pil,nomarl_upscale
+from .utils import find_directories,process_video, cf_tensor2cv,process_video_v2,load_images,nomarl_upscale
 from .origin_infer import Echo_v1_load_model,Echo_v2_load_model,Echo_v1_predata,Echo_v2_predata
 from .echomimic_v3.infer import load_v3_model,infer_v3,Config,Echo_v3_predata
 
@@ -83,11 +83,13 @@ class Echo_LoadModel:
         return {
             "required": {
                 "vae": (folder_paths.get_filename_list("vae"),),
+                "lora": (["None"]+folder_paths.get_filename_list("loras"),),
                 "denoising": ("BOOLEAN", {"default": True},),
                 "infer_mode": (["audio_drived", "audio_drived_acc", "pose_normal_dwpose","pose_normal_sapiens", "pose_acc"],),
                 "lowvram": ("BOOLEAN", {"default": True},),
                 "teacache_offload": ("BOOLEAN", {"default": True},),
                 "use_mmgp": (["LowRAM_LowVRAM","None", "VerylowRAM_LowVRAM","LowRAM_HighVRAM","HighRAM_LowVRAM","HighRAM_HighVRAM" ],), 
+
                 "version": (["V3","V2", "V1", ],), },
         }
     
@@ -96,7 +98,7 @@ class Echo_LoadModel:
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
     
-    def main_loader(self, vae, denoising, infer_mode,  lowvram,teacache_offload,use_mmgp, version):
+    def main_loader(self, vae, lora,denoising, infer_mode,  lowvram,teacache_offload,use_mmgp, version):
         
         config_v3,audio_pt,face_locator_pt,pose_encoder_pt,tokenizer,temporal_compression_ratio=None,None,None,None,None,None
         if "V1"==version :
@@ -107,8 +109,11 @@ class Echo_LoadModel:
             config_v3=Config()
             config_v3.config_path=os.path.join(current_path, "echomimic_v3/config/config.yaml")
             config_v3.teacache_offload=teacache_offload
-            model, temporal_compression_ratio,tokenizer=load_v3_model(current_path,weigths_current_path,config_v3, device,use_mmgp,vae)
-        print("model loaded")
+
+            lora_path=folder_paths.get_full_path("loras", lora) if lora!="None" else None
+
+            model, temporal_compression_ratio,tokenizer=load_v3_model(current_path,weigths_current_path,config_v3, device,use_mmgp,vae,lora_path)
+        print("##### model loaded #####")
         info = {"lowvram": lowvram,"version":version,"tokenizer":tokenizer,
                 "infer_mode":infer_mode,"audio_pt":audio_pt, "face_locator_pt":face_locator_pt,"pose_encoder_pt":pose_encoder_pt,"temporal_compression_ratio":temporal_compression_ratio}
         info.update({"config":config_v3})
