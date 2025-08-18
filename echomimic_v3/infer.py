@@ -68,7 +68,7 @@ class Config:
         self.vae_path = None
 
         # Sampler and audio settings
-        self.sampler_name = "Flow_DPM++"
+        self.sampler_name ="Flow_DPM++"
         self.audio_scale = 1.0
         self.enable_teacache = False
         self.teacache_threshold = 0.1
@@ -165,7 +165,7 @@ def get_file_path(base_dir, folder, test_name, extensions):
     raise FileNotFoundError(f"No file found for '{test_name}' in '{folder}' with extensions: {extensions}")
 
 
-def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path):
+def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path,lora_path):
 
      # Load configuration file
     cfg = OmegaConf.load(config.config_path)
@@ -190,6 +190,15 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
         missing, unexpected = transformer.load_state_dict(state_dict, strict=False)
         print(f"Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
 
+    if lora_path:
+        from .lora_adapter import WanLoraWrapper
+        lora_wrapper = WanLoraWrapper(transformer)
+        lora_name = lora_wrapper.load_lora(lora_path)
+        lora_wrapper.apply_lora(lora_name, 1.0)
+        transformer=lora_wrapper.model
+        config.sampler_name="Flow_Unipc"
+
+
     vae_path_=folder_paths.get_full_path("vae", vae_path)
     vae = AutoencoderKLWan.from_pretrained(vae_path_,
        # os.path.join(config.model_name, cfg['vae_kwargs'].get('vae_subpath', 'vae')),
@@ -199,7 +208,7 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
 
     tokenizer = AutoTokenizer.from_pretrained(os.path.join(config.model_name, "google/umt5-xxl"))
 
-    # cfg.image_encoder_kwargs.image_encoder_subpath="F:/test/ComfyUI/models/clip_vision/models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth"
+
     # clip_image_encoder = CLIPModel.from_pretrained(
     #     os.path.join(config.model_name, cfg['image_encoder_kwargs'].get('image_encoder_subpath', 'image_encoder')),
     # ).to(config.weight_dtype).eval()
@@ -248,6 +257,12 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
         pipeline.to(device)
     temporal_compression_ratio=pipeline.vae.config.temporal_compression_ratio
     #print(f"temporal_compression_ratio: {temporal_compression_ratio}") #4
+   
+
+   
+  
+
+
     return pipeline,temporal_compression_ratio,tokenizer
 
 def infer_v3(pipeline, config, device,video_length,prompt_embeds,negative_prompt_embeds,
