@@ -8,6 +8,7 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 ---
 
 # New Updates 
+* v3版本新增lightX2V Lora的支持， step可以设置为10步（使用Lora时自动开启Unip）/you can use lightX2V Lora when use V3 version, set stpe=10; 
 * 修复bug，retina-face 模型改成本地运行
 * V3正式上线，测试环境12G VRAM，OOM需要减少视频分块(partial_video_length)的数值，12G可以跑65，16可以试试97，更高可以试试113
 * V3 is Done,you can try it now.. need 8G and more (use mmgp,LOW LOW,partial_video_length==65 or 33)
@@ -123,6 +124,7 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 3.3.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)   
 3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer    
 3.3.5 [retinaface.h5](https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5)  目录下没有一般会自动下载
+3.3.6 可选/optional lora  [kijai](https://huggingface.co/Kijai/WanVideo_comfy/tree/main/Lightx2v)
 ```
 ├── ComfyUI/models/echo_mimic/transformer 
 |         ├── diffusion_pytorch_model.safetensors  # Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。
@@ -140,6 +142,9 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 |         ├── Wan2.1_VAE.pth
 ├── ComfyUI/models/echo_mimic/.deepface/weights/    #注意.deepface前面有个点，这个是方便不能翻墙玩家
 |         ├──retinaface.h5
+├── ComfyUI/models/loras/    #注意.deepface前面有个点，这个是方便不能翻墙玩家
+|         ├──lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors  #KJ
+
 ```
 
 
@@ -234,6 +239,18 @@ EchoMimici-V3
   archivePrefix={arXiv}
 }
 ```
+LightX2V
+```
+@misc{lightx2v,
+ author = {LightX2V Contributors},
+ title = {LightX2V: Light Video Generation Inference Framework},
+ year = {2025},
+ publisher = {GitHub},
+ journal = {GitHub repository},
+ howpublished = {\url{https://github.com/ModelTC/lightx2v}},
+}
+````
+
 sapiens
 ```
 @article{khirodkar2024sapiens,
