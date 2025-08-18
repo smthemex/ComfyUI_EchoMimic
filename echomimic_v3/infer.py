@@ -117,6 +117,7 @@ def load_wav2vec_models(wav2vec_model_dir):
     processor = Wav2Vec2Processor.from_pretrained(wav2vec_model_dir)
     model = Wav2Vec2Model.from_pretrained(wav2vec_model_dir).eval()
     model.requires_grad_(False)
+    model.to("cpu")
     return processor, model
 
 
@@ -125,7 +126,7 @@ def extract_audio_features(audio_path, processor, model_):
     sr = 16000
     audio_segment, sample_rate = librosa.load(audio_path, sr=sr)
     input_values = processor(audio_segment, sampling_rate=sample_rate, return_tensors="pt").input_values
-    input_values=input_values.to(model_.device)
+    input_values=input_values.to("cpu")
     features = model_(input_values).last_hidden_state
     return features.squeeze(0)
 
