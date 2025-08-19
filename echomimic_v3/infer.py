@@ -260,16 +260,37 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
    
 
    
-  
 
 
     return pipeline,temporal_compression_ratio,tokenizer
 
 def infer_v3(pipeline, config, device,video_length,prompt_embeds,negative_prompt_embeds,
              temporal_compression_ratio,seed,partial_video_length,audio_embeds,ip_mask,sample_height,
-             sample_width,clip_context,latent_frames,ref_img,audio_file_prefix):
+             sample_width,clip_context,ref_img,audio_file_prefix):
 
     generator = torch.Generator(device=device).manual_seed(seed)
+
+    if 4 == config.num_inference_steps and config.sampler_name=="Flow_Unipc":
+        print("Using LCM schedulers")
+        lcm_config = {
+        "infer_steps": 4,
+        "target_video_length": 81,
+        "target_height": 480,
+        "target_width": 832,
+        "self_attn_1_type": "flash_attn3",
+        "cross_attn_1_type": "flash_attn3",
+        "cross_attn_2_type": "flash_attn3",
+        "seed": 442,
+        "sample_guide_scale": 5,
+        "denoising_step_list": [1000, 750, 500, 250],
+        "sample_shift": 5,
+        "enable_cfg": False,
+        "cpu_offload": False,
+            }
+        
+        config_ =OmegaConf.create(lcm_config)
+        from .src.flow_match_lcm import WanStepDistillScheduler
+        pipeline.scheduler = WanStepDistillScheduler(config_)
     
     # if config.enable_riflex:
     #     pipeline.transformer.enable_riflex(k = config.riflex_k, L_test = latent_frames)
@@ -590,36 +611,3 @@ def cf_clip(txt_list, clip,prompt_attention_mask,device, dtype):
         pos_cond_list.append(positive)
    
     return pos_cond_list
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
