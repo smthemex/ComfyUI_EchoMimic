@@ -8,6 +8,7 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 ---
 
 # New Updates 
+* add LCM support ,if set step=4（and lightX2V lora）,will run in LCM/ 步数设置为4时，自动开启LCM，当然也要lora
 * v3版本新增lightX2V Lora的支持， step可以设置为10步（使用Lora时自动开启Unip）/you can use lightX2V Lora when use V3 version, set step=10; 
 * 修复bug，retina-face 模型改成本地运行
 * V3正式上线，测试环境12G VRAM，OOM需要减少视频分块(partial_video_length)的数值，12G可以跑65，16可以试试97，更高可以试试113
