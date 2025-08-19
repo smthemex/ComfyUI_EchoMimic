@@ -248,7 +248,7 @@ class Echo_Sampler:
             output_video=infer_v3(model, config, device,emb.get("video_length"),emb.get("prompt_embeds"),emb.get("negative_prompt_embeds"),
              emb.get("temporal_compression_ratio"),seed,emb.get("partial_video_length"),emb.get("audio_embeds"),emb.get("ip_mask"),
              emb.get("sample_height"),emb.get("sample_width"),emb.get("clip_context"),
-             emb.get("latent_frames"),emb.get("ref_image_pil"),emb.get("audio_file_prefix"))
+             emb.get("ref_image_pil"),emb.get("audio_file_prefix"))
 
         frame_rate = float(emb.get("fps"))
         if not lowvram and version!="V3":  # for upsacle ,need  VR
