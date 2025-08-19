@@ -18,8 +18,8 @@ from diffusers.video_processor import VideoProcessor
 from einops import rearrange
 from PIL import Image
 from transformers import T5Tokenizer,AutoTokenizer
-
-
+from diffusers import WanPipeline
+from .flow_match_lcm import WanStepDistillScheduler
 from ..src.wan_text_encoder import WanT5EncoderModel
 from ..src.wan_vae import AutoencoderKLWan
 from ..src.wan_image_encoder import CLIPModel
@@ -411,9 +411,14 @@ class WanFunInpaintAudioPipeline(DiffusionPipeline):
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
-
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
+        if isinstance(self.scheduler, WanStepDistillScheduler):
+            # WanStepDistillScheduler 不需要 eta 和 generator 参数
+            extra_step_kwargs["generator"] = generator
+            return extra_step_kwargs
+        
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
@@ -615,9 +620,15 @@ class WanFunInpaintAudioPipeline(DiffusionPipeline):
                 self.scheduler,
                 device=device,
                 sigmas=sampling_sigmas)
+        elif isinstance(self.scheduler, WanStepDistillScheduler):
+            # 特殊处理 WanStepDistillScheduler
+            self.scheduler.set_denoising_timesteps(device=device)
+            timesteps = self.scheduler.timesteps
+            num_inference_steps = len(timesteps)
         else:
             timesteps, num_inference_steps = retrieve_timesteps(self.scheduler, num_inference_steps, device, timesteps)
         self._num_timesteps = len(timesteps)
+        
         if comfyui_progressbar:
             from comfy.utils import ProgressBar
             pbar = ProgressBar(num_inference_steps + 2)
@@ -709,6 +720,7 @@ class WanFunInpaintAudioPipeline(DiffusionPipeline):
         target_shape = (self.vae.latent_channels, (num_frames - 1) // self.vae.temporal_compression_ratio + 1, width // self.vae.spacial_compression_ratio, height // self.vae.spacial_compression_ratio)
         seq_len = math.ceil((target_shape[2] * target_shape[3]) / (self.transformer.config.patch_size[1] * self.transformer.config.patch_size[2]) * target_shape[1]) 
         # 7. Denoising loop
+
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
 
         if do_classifier_free_guidance:
@@ -782,6 +794,7 @@ class WanFunInpaintAudioPipeline(DiffusionPipeline):
                     noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_drop_audio - noise_pred_uncond) + self.audio_guidance_scale * (noise_pred_cond - noise_pred_drop_audio)
                     
                 # compute the previous noisy sample x_t -> x_t-1
+              
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
 
                 if callback_on_step_end is not None:
