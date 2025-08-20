@@ -109,7 +109,7 @@ class Echo_LoadModel:
             config_v3=Config()
             config_v3.config_path=os.path.join(current_path, "echomimic_v3/config/config.yaml")
             config_v3.teacache_offload=teacache_offload
-
+            config_v3.quantize_transformer=lowvram
             lora_path=folder_paths.get_full_path("loras", lora) if lora!="None" else None
 
             model, temporal_compression_ratio,tokenizer=load_v3_model(current_path,weigths_current_path,config_v3, device,use_mmgp,vae,lora_path)
