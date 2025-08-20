@@ -108,6 +108,7 @@ class Config:
 
         self.wav2vec_model_dir = "models/wav2vec2-base-960h"
         self.save_path = "outputs"
+        self.quantize_transformer=True
 
 
 
@@ -239,20 +240,20 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
             num_skip_start_steps=config.num_skip_start_steps, offload=config.teacache_offload
         )
 
-  
+    
     if use_mmgp!="None":
         from mmgp import offload, profile_type
         pipeline.to("cpu")
         if use_mmgp=="VerylowRAM_LowVRAM":
-            offload.profile(pipeline, profile_type.VerylowRAM_LowVRAM)
+            offload.profile(pipeline, profile_type.VerylowRAM_LowVRAM,quantizeTransformer=config.quantize_transformer)
         elif use_mmgp=="LowRAM_LowVRAM":  
-            offload.profile(pipeline, profile_type.LowRAM_LowVRAM)
+            offload.profile(pipeline, profile_type.LowRAM_LowVRAM,quantizeTransformer=config.quantize_transformer)
         elif use_mmgp=="LowRAM_HighVRAM":
-            offload.profile(pipeline, profile_type.LowRAM_HighVRAM)
+            offload.profile(pipeline, profile_type.LowRAM_HighVRAM,quantizeTransformer=config.quantize_transformer)
         elif use_mmgp=="HighRAM_LowVRAM":
-            offload.profile(pipeline, profile_type.HighRAM_LowVRAM)
+            offload.profile(pipeline, profile_type.HighRAM_LowVRAM,quantizeTransformer=config.quantize_transformer)
         elif use_mmgp=="HighRAM_HighVRAM":
-            offload.profile(pipeline, profile_type.HighRAM_HighVRAM)
+            offload.profile(pipeline, profile_type.HighRAM_HighVRAM,quantizeTransformer=config.quantize_transformer)
     else:
         pipeline.to(device)
     temporal_compression_ratio=pipeline.vae.config.temporal_compression_ratio
