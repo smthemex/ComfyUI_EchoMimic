@@ -8,6 +8,7 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 ---
 
 # New Updates 
+* you can set lowram 'False ' to close mmgp 's fp8 quantum ，will get more quality output./设置lowram为false时，关闭mmgp的FP8 量化以得到更好的质量。
 * add LCM support ,if set step=4（and lightX2V lora）,will run in LCM/ 步数设置为4时，自动开启LCM，当然也要lora
 * v3版本新增lightX2V Lora的支持， step可以设置为10步（使用Lora时自动开启Unip）/you can use lightX2V Lora when use V3 version, set step=10; 
 * 修复bug，retina-face 模型改成本地运行
