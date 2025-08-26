@@ -1,10 +1,7 @@
 # pip install retina-face
 # we recommand tensorflow==2.15
 # 
-import os
-import folder_paths
 
-os.environ['DEEPFACE_HOME'] = os.path.join(folder_paths.models_dir,"echo_mimic")
 
 from retinaface import RetinaFace
 import sys
