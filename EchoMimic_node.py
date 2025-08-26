@@ -10,11 +10,15 @@ import gc
 import platform
 import subprocess
 
+import folder_paths
+
+os.environ['DEEPFACE_HOME'] = os.path.join(folder_paths.models_dir,"echo_mimic")
+print(os.path.join(folder_paths.models_dir,"echo_mimic"))
+
 from .utils import find_directories,process_video, cf_tensor2cv,process_video_v2,load_images,nomarl_upscale
 from .origin_infer import Echo_v1_load_model,Echo_v2_load_model,Echo_v1_predata,Echo_v2_predata
 from .echomimic_v3.infer import load_v3_model,infer_v3,Config,Echo_v3_predata
 
-import folder_paths
 
 
 MAX_SEED = np.iinfo(np.int32).max
