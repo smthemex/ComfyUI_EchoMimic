@@ -19,19 +19,16 @@ from diffusers.models.modeling_utils import ModelMixin
 from diffusers.utils import is_torch_version, logging
 from torch import nn
 
+from .dist import (get_sequence_parallel_rank,
+                    get_sequence_parallel_world_size, get_sp_group,
+                    xFuserLongContextAttention)
+from .dist.wan_xfuser import usp_attn_forward
+from .cache_utils import TeaCache
+from .wan_camera_adapter import SimpleAdapter
 
-
-
-# from ..src.dist import (get_sequence_parallel_rank,
-#                     get_sequence_parallel_world_size, get_sp_group,
-#                     xFuserLongContextAttention)
-# from ..src.dist.wan_xfuser import usp_attn_forward
-from ..src.cache_utils import TeaCache
-from ..src.wan_camera_adapter import SimpleAdapter
 
 from einops import rearrange
 import torch.nn.functional as F
-
 
 try:
     import flash_attn_interface
@@ -44,6 +41,120 @@ try:
     FLASH_ATTN_2_AVAILABLE = True
 except ModuleNotFoundError:
     FLASH_ATTN_2_AVAILABLE = False
+
+
+class BlockGPUManager:
+    def __init__(self, device="cuda",block_group_size=1 ):
+        self.device = device
+        self.managed_modules = []
+        self.embedder_modules = []
+        self.output_modules = []     
+        self.block_group_size = block_group_size
+        # 跟踪哪些blocks当前在GPU上
+        self.blocks_on_gpu = set()
+    
+    def get_gpu_memory_usage(self):
+        """获取GPU内存使用情况"""
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            allocated = torch.cuda.memory_allocated() / 1024 / 1024  # MB
+            reserved = torch.cuda.memory_reserved() / 1024 / 1024  # MB
+            total = torch.cuda.get_device_properties(0).total_memory / 1024 / 1024  # MB
+            free = total - allocated
+            
+            return {
+                'allocated_mb': allocated,
+                'reserved_mb': reserved,
+                'total_mb': total,
+                'free_mb': free
+            }
+        return None
+    
+    def setup_for_inference(self, transformer_model, ):
+        self._collect_managed_modules(transformer_model)
+        self._initialize_embedder_output_modules()
+        return self
+
+    def _collect_managed_modules(self, transformer_model):
+        self.managed_modules = []
+        for i, block in enumerate(transformer_model.blocks):
+            self.managed_modules.append(block)
+
+        module_type_mapping = {
+            'embedder': ['patch_embedding', 'control_adapter', 'ref_conv',
+                        'time_embedding', 'time_projection', 'audio_injection',
+                        'text_embedding', 'img_emb'],
+            'output': ['head']
+            }
+    
+        for module_type, module_names in module_type_mapping.items():
+            modules = []
+            for name in module_names:
+                if hasattr(transformer_model, name):
+                    modules.append(getattr(transformer_model, name))
+            setattr(self, f'{module_type}_modules', modules)
+    
+        return self
+
+    
+    def _initialize_embedder_output_modules(self):
+        """初始化embedder和output模块，将它们移到GPU"""
+ 
+        for module in self.embedder_modules:
+            if hasattr(module, 'to'):
+                module.to(self.device)
+        
+        for module in self.output_modules:
+            if hasattr(module, 'to'):
+                module.to(self.device)
+        
+        return self
+
+    def unload_all_blocks_to_cpu(self):
+        """卸载所有block到CPU"""
+        print(f"[GPU Manager] 卸载所有block到CPU")
+        
+        # 将所有模块移到CPU
+        for i, module in enumerate(self.managed_modules):
+            if hasattr(module, 'to'):
+                module.to('cpu')
+        
+        for module in self.embedder_modules:
+            if hasattr(module, 'to'):
+                module.to('cpu')
+        
+        for module in self.output_modules:
+            if hasattr(module, 'to'):
+                module.to('cpu')
+        
+        # 清空GPU缓存
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        return self
+
+
+
+def get_ai2v_audio(
+    audio, 
+    vae_scale, 
+    audio_window,
+    device,
+    dtype
+    ):
+    audio_cond = audio.to(device=device, dtype=dtype)
+    first_frame_audio_emb_s = audio_cond[:, :1, ...] 
+    latter_frame_audio_emb = audio_cond[:, 1:, ...] 
+    latter_frame_audio_emb = rearrange(latter_frame_audio_emb, "b (n_t n) w s c -> b n_t n w s c", n=vae_scale) 
+    middle_index = audio_window // 2
+    latter_first_frame_audio_emb = latter_frame_audio_emb[:, :, :1, :middle_index+1, ...] 
+    latter_first_frame_audio_emb = rearrange(latter_first_frame_audio_emb, "b n_t n w s c -> b n_t (n w) s c") 
+    latter_last_frame_audio_emb = latter_frame_audio_emb[:, :, -1:, middle_index:, ...] 
+    latter_last_frame_audio_emb = rearrange(latter_last_frame_audio_emb, "b n_t n w s c -> b n_t (n w) s c") 
+    latter_middle_frame_audio_emb = latter_frame_audio_emb[:, :, 1:-1, middle_index:middle_index+1, ...] 
+    latter_middle_frame_audio_emb = rearrange(latter_middle_frame_audio_emb, "b n_t n w s c -> b n_t (n w) s c") 
+    latter_frame_audio_emb_s = torch.concat([latter_first_frame_audio_emb, latter_middle_frame_audio_emb, latter_last_frame_audio_emb], dim=2) 
+    return first_frame_audio_emb_s, latter_frame_audio_emb_s
 
 
 def flash_attention(
@@ -154,17 +265,71 @@ def flash_attention(
     # output
     return x.type(out_dtype)
 
-class AudioProjModel(nn.Module):
-    def __init__(self, audio_in_dim=1024, cross_attention_dim=1024):
-        super().__init__()
-        self.cross_attention_dim = cross_attention_dim
-        self.proj = torch.nn.Linear(audio_in_dim, cross_attention_dim, bias=False)
-        self.norm = torch.nn.LayerNorm(cross_attention_dim)
 
-    def forward(self, audio_embeds):
-        context_tokens = self.proj(audio_embeds)
+class AudioProjModel(ModelMixin, ConfigMixin):
+    def __init__(
+        self,
+        seq_len=5,
+        seq_len_vf=12,
+        blocks=12,  
+        channels=768, 
+        intermediate_dim=512,
+        output_dim=768,
+        context_tokens=32,
+        norm_output_audio=False,
+    ):
+        super().__init__()
+
+        self.seq_len = seq_len
+        self.blocks = blocks
+        self.channels = channels
+        self.input_dim = seq_len * blocks * channels  
+        self.input_dim_vf = seq_len_vf * blocks * channels
+        self.intermediate_dim = intermediate_dim
+        self.context_tokens = context_tokens
+        self.output_dim = output_dim
+
+        # define multiple linear layers
+        self.proj1 = nn.Linear(self.input_dim, intermediate_dim)
+        self.proj1_vf = nn.Linear(self.input_dim_vf, intermediate_dim)
+        self.proj2 = nn.Linear(intermediate_dim, intermediate_dim)
+        self.proj3 = nn.Linear(intermediate_dim, context_tokens * output_dim)
+        self.norm = nn.LayerNorm(output_dim) if norm_output_audio else nn.Identity()
+
+    def forward(self, audio_embeds, audio_embeds_vf):
+        video_length = audio_embeds.shape[1] + audio_embeds_vf.shape[1]
+        B, _, _, S, C = audio_embeds.shape
+
+        # process audio of first frame
+        audio_embeds = rearrange(audio_embeds, "bz f w b c -> (bz f) w b c")
+        batch_size, window_size, blocks, channels = audio_embeds.shape
+        audio_embeds = audio_embeds.view(batch_size, window_size * blocks * channels)
+
+        # process audio of latter frame
+        audio_embeds_vf = rearrange(audio_embeds_vf, "bz f w b c -> (bz f) w b c")
+        batch_size_vf, window_size_vf, blocks_vf, channels_vf = audio_embeds_vf.shape
+        audio_embeds_vf = audio_embeds_vf.view(batch_size_vf, window_size_vf * blocks_vf * channels_vf)
+
+        # first projection
+        audio_embeds = torch.relu(self.proj1(audio_embeds))  
+        audio_embeds_vf = torch.relu(self.proj1_vf(audio_embeds_vf))  
+        audio_embeds = rearrange(audio_embeds, "(bz f) c -> bz f c", bz=B)  
+        audio_embeds_vf = rearrange(audio_embeds_vf, "(bz f) c -> bz f c", bz=B) 
+        audio_embeds_c = torch.concat([audio_embeds, audio_embeds_vf], dim=1)  
+        batch_size_c, N_t, C_a = audio_embeds_c.shape
+        audio_embeds_c = audio_embeds_c.view(batch_size_c*N_t, C_a)
+
+        # second projection
+        audio_embeds_c = torch.relu(self.proj2(audio_embeds_c)) 
+
+        context_tokens = self.proj3(audio_embeds_c).reshape(batch_size_c*N_t, self.context_tokens, self.output_dim) 
+
+        # normalization and reshape
         context_tokens = self.norm(context_tokens)
-        return context_tokens  # [B,L,C]
+        context_tokens = rearrange(context_tokens, "(bz f) m c -> bz f m c", f=video_length)
+        return context_tokens
+
+
 
 def attention(
     q,
@@ -229,7 +394,7 @@ def split_audio_sequence(audio_proj_length, num_frames):
                 (within the audio feature sequence) corresponding to a latent frame.
         """
         # Average number of tokens per original video frame
-        tokens_per_frame = audio_proj_length / num_frames
+        tokens_per_frame = audio_proj_length / num_frames #2
 
         # Each latent frame covers 4 video frames, and we want the center
         tokens_per_latent_frame = tokens_per_frame * 4
@@ -240,9 +405,9 @@ def split_audio_sequence(audio_proj_length, num_frames):
             if i == 0:
                 pos_indices.append(0)
             else:
-                start_token = tokens_per_frame * ((i - 1) * 4 + 1)- 4
-                end_token = tokens_per_frame * (i * 4 + 1) + 4
-                center_token = int((start_token + end_token) / 2) - 1
+                start_token = tokens_per_frame * ((i - 1) * 4 + 1) - 4  # Subtract 4 for overlap
+                end_token = tokens_per_frame * (i * 4 + 1) + 1  # Add 4 for overlap
+                center_token = int((start_token + end_token) / 2) - 4
                 pos_indices.append(center_token)
 
         # Build index ranges centered around each position
@@ -276,8 +441,8 @@ def split_tensor_with_padding(input_tensor, pos_idx_ranges, expand_length=0):
         [idx[0] - expand_length, idx[1] + expand_length] for idx in pos_idx_ranges
     ]
     sub_sequences = []
-    seq_len = input_tensor.size(1)  # 173
-    max_valid_idx = seq_len - 1  # 172
+    seq_len = input_tensor.size(1)  
+    max_valid_idx = seq_len - 1  
     k_lens_list = []
     for start, end in pos_idx_ranges:
         # Calculate the fill amount
@@ -307,7 +472,6 @@ def split_tensor_with_padding(input_tensor, pos_idx_ranges, expand_length=0):
     return torch.stack(sub_sequences, dim=1), torch.tensor(
         k_lens_list, dtype=torch.long
     )
-
 
 
 def audio_attention(
@@ -348,7 +512,7 @@ def audio_attention(
             )
         attn_mask = None
 
-        q = q.transpose(1, 2) #b, h, n, d
+        q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
@@ -398,29 +562,14 @@ def audio_mask_attention(
             )
         attn_mask = None
 
-        q = q.transpose(1, 2) #bt, h, n, d
-        
-        k = k.transpose(1, 2) #bt, h, c_l, d
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2) 
         v = v.transpose(1, 2)
-        
 
         out = torch.nn.functional.scaled_dot_product_attention(
             q, k, v, attn_mask=attn_mask, is_causal=causal, dropout_p=dropout_p)
         out = out.transpose(1, 2).contiguous()
     return out
-
-def get_audio_mask(ip_mask, latent_t):
-    """
-    ip_mask B， n_q
-    """
-    b, n = ip_mask.shape
-    # _, h, n_q, d = q.shape
-    # Step 1: 将 mask 转换为 [b*T, 1, n, 1]
-    ip_mask = ip_mask.repeat_interleave(latent_t, dim=0).view(-1, n, 1, 1)  # [b*T, 1, n, 1]
-
-    # # Step 2: 原地广播到 [b*T, h, n, d] 并直接点乘
-    # out = out * ip_mask.expand_as(out)  # [b*T, h, n, d] # [b*T, n_q, n_k]
-    return ip_mask
 
 def sinusoidal_embedding_1d(dim, position):
     # preprocess
@@ -551,8 +700,7 @@ def rope_apply(x, grid_sizes, freqs):
 
         # append to collection
         output.append(x_i)
-    return torch.stack(output).float() #OOM TODO
-    #return torch.stack(output)
+    return torch.stack(output).float()
 
 
 class WanRMSNorm(nn.Module):
@@ -568,8 +716,7 @@ class WanRMSNorm(nn.Module):
         Args:
             x(Tensor): Shape [B, L, C]
         """
-        return self._norm(x.float()).type_as(x) * self.weight #OOM TODO
-        #return self._norm(x).type_as(x) * self.weight
+        return self._norm(x.float()).type_as(x) * self.weight
 
     def _norm(self, x):
         return x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)
@@ -585,9 +732,7 @@ class WanLayerNorm(nn.LayerNorm):
         Args:
             x(Tensor): Shape [B, L, C]
         """
-        #return super().forward(x.float()).type_as(x)
-        return super().forward(x).type_as(x)
-
+        return super().forward(x.float()).type_as(x)
 
 
 class WanSelfAttention(nn.Module):
@@ -680,7 +825,6 @@ class WanT2VCrossAttention(WanSelfAttention):
 
 
 class WanI2VCrossAttention(WanSelfAttention):
-
     def __init__(self,
                  dim,
                  num_heads,
@@ -691,7 +835,6 @@ class WanI2VCrossAttention(WanSelfAttention):
 
         self.k_img = nn.Linear(dim, dim)
         self.v_img = nn.Linear(dim, dim)
-        # self.alpha = nn.Parameter(torch.zeros((1, )))
         self.norm_k_img = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
     def forward(self, x, context, context_lens, dtype):
@@ -748,22 +891,14 @@ class WanI2VCrossAttentionAudio(WanSelfAttention):
 
         self.k_img = nn.Linear(dim, dim)
         self.v_img = nn.Linear(dim, dim)
-        # self.alpha = nn.Parameter(torch.zeros((1, )))
         self.norm_k_img = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
-        self.k_audio = nn.Linear(dim, dim, bias=False)
-        self.v_audio = nn.Linear(dim, dim, bias=False)
-        # print(dim, 'dim')
-        # self.alpha = nn.Parameter(torch.zeros((1, )))
+        self.q_audio = nn.Linear(dim, dim)
+        self.k_audio = nn.Linear(dim, dim)
+
+        self.v_audio = nn.Linear(dim, dim)
         self.norm_k_audio = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
-
-        nn.init.zeros_(self.k_audio.weight)
-        nn.init.zeros_(self.v_audio.weight)
-
-        # if self.k_audio.bias is not None:
-        #     nn.init.zeros_(self.k_audio.bias)
-        # if self.v_audio.bias is not None:
-        #     nn.init.zeros_(self.v_audio.bias)
+        
 
     def forward(self, x, context, context_lens, dtype):
         r"""
@@ -772,24 +907,30 @@ class WanI2VCrossAttentionAudio(WanSelfAttention):
             context(List): Shape [B, L2, C], [B, L3, C]
             context_lens(Tensor): Shape [B]
         """
-        context, context_audio, latent_t, ip_mask, audio_context_lens, audio_scale = context
+        context, context_audio, latent_t, ip_mask, audio_context_lens = context
+        assert latent_t == context_audio.shape[1], "audio shape error"
         context_img = context[:, :257]
         context = context[:, 257:]
         b, n, d = x.size(0), self.num_heads, self.head_dim
 
         # compute query, key, value
-        q = self.norm_q(self.q(x.to(dtype))).view(b, -1, n, d)
+        q = self.norm_q(self.q(x.to(dtype)))
+        q_auido = self.q_audio(q)
+        q = q.view(b, -1, n, d)
+
         k = self.norm_k(self.k(context.to(dtype))).view(b, -1, n, d)
         v = self.v(context.to(dtype)).view(b, -1, n, d)
 
         k_img = self.norm_k_img(self.k_img(context_img.to(dtype))).view(b, -1, n, d)
         v_img = self.v_img(context_img.to(dtype)).view(b, -1, n, d)
+        context_audio = rearrange(context_audio, "b f w c -> (b f) w c")
 
         k_audio = self.k_audio(context_audio.to(dtype))
-        k_audio = self.norm_k_audio(k_audio) #bt, w, dims
+        k_audio = self.norm_k_audio(k_audio)
 
         bt = k_audio.shape[0]
         k_audio = k_audio.view(bt, -1, n, d)
+
         v_audio = self.v_audio(context_audio.to(dtype)).view(bt, -1, n, d)
 
         q_auido = q.view(b * latent_t, -1, n, d)
@@ -799,16 +940,11 @@ class WanI2VCrossAttentionAudio(WanSelfAttention):
             k_audio.to(dtype),
             v_audio.to(dtype),
             k_lens=None
-        )#bt,n, s, d
+        ) 
 
-        audio_mask = get_audio_mask(ip_mask, latent_t)
-        # print(audio_mask.shape, audio_x.shape, 'check')
-        if audio_mask.size(0) != audio_x.size(0):
-            print(audio_mask.shape, audio_x.shape, 'check')
-        else:
-            audio_x = audio_x * audio_mask # bt, s, n, d
 
         audio_x = audio_x.view(b, latent_t, -1, n, d).view(b, -1, n, d)
+
 
         img_x = attention(
             q.to(dtype), 
@@ -819,7 +955,6 @@ class WanI2VCrossAttentionAudio(WanSelfAttention):
         img_x = img_x.to(dtype)
         
         # compute attention
-        # print(context_lens, 'context_lens')
         x = attention(
             q.to(dtype), 
             k.to(dtype), 
@@ -832,7 +967,7 @@ class WanI2VCrossAttentionAudio(WanSelfAttention):
         x = x.flatten(2)
         img_x = img_x.flatten(2)
         audio_x = audio_x.flatten(2)
-        x = x + img_x + audio_x * audio_scale
+        x = x + img_x + audio_x * 1.
         x = self.o(x)
         return x
 
@@ -869,10 +1004,10 @@ class WanAttentionBlock(nn.Module):
             dim, eps,
             elementwise_affine=True) if cross_attn_norm else nn.Identity()
         self.cross_attn = WAN_CROSSATTENTION_CLASSES[cross_attn_type](dim,
-                                                                      num_heads,
-                                                                      (-1, -1),
-                                                                      qk_norm,
-                                                                      eps)
+                                                                    num_heads,
+                                                                    (-1, -1),
+                                                                    qk_norm,
+                                                                    eps)
         self.norm2 = WanLayerNorm(dim, eps)
         self.ffn = nn.Sequential(
             nn.Linear(dim, ffn_dim), nn.GELU(approximate='tanh'),
@@ -903,7 +1038,6 @@ class WanAttentionBlock(nn.Module):
         e = (self.modulation + e).chunk(6, dim=1)
 
         # self-attention
-        #print (x.shape,e[1].shape) #torch.Size([3, 44544, 1536]) torch.Size([3, 1, 1536])
         temp_x = self.norm1(x) * (1 + e[1]) + e[0]
         temp_x = temp_x.to(dtype)
 
@@ -968,15 +1102,13 @@ class MLPProj(torch.nn.Module):
         clip_extra_context_tokens = self.proj(image_embeds)
         return clip_extra_context_tokens
 
+
+
 class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
 
-    # ignore_for_config = [
-    #     'patch_size', 'cross_attn_norm', 'qk_norm', 'text_dim', 'window_size'
-    # ]
-    # _no_split_modules = ['WanAttentionBlock']
     _supports_gradient_checkpointing = True
 
     @register_to_config
@@ -1044,11 +1176,16 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
 
         assert model_type in ['t2v', 'i2v']
         self.model_type = model_type
-
+        
         # 0. audioprojmodel
-        self.audio2token = AudioProjModel(
-            768, 1536
-        )
+        self.audio_injection = AudioProjModel(
+                    seq_len=5,
+                    seq_len_vf=5+4-1,
+                    intermediate_dim=512,
+                    output_dim=1536,
+                    context_tokens=32,
+                    norm_output_audio=True,
+                )
 
         self.patch_size = patch_size
         self.text_len = text_len
@@ -1182,6 +1319,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
         y_camera=None,
         full_ref=None,
         cond_flag=True,
+        gpu_manager=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -1213,24 +1351,13 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
         dtype = x.dtype
         if self.freqs.device != device and torch.device(type="meta") != device:
             self.freqs = self.freqs.to(device)
-        # print(x[0].shape, 'ori_x.shape')
 
         if y is not None:
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
 
         # embeddings
-        # print(x[0].shape, 'x.shape')
         x = [self.patch_embedding(u.unsqueeze(0)) for u in x]
-        # print(x[0].shape, 'x.patah')
-        """
-        torch.Size([3, 16, 19, 122, 75]) latents.shape 19 torch.Size([3, 9150])
-        torch.Size([36, 19, 122, 75]) x.shape
-        torch.Size([1, 1536, 19, 61, 37]) x.patah
-        torch.Size([3, 16, 19, 101, 91]) latents.shape 19 torch.Size([3, 9191])
-        torch.Size([36, 19, 101, 91]) x.shape
-        torch.Size([1, 1536, 19, 50, 45]) x.patah
-        """
-
+        
         # add control adapter
         if self.control_adapter is not None and y_camera is not None:
             y_camera = self.control_adapter(y_camera)
@@ -1240,7 +1367,6 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
             [torch.tensor(u.shape[2:], dtype=torch.long) for u in x])
 
         x = [u.flatten(2).transpose(1, 2) for u in x]
-        # print(x[0].shape, 'x.patahflat')
 
         if self.ref_conv is not None and full_ref is not None:
             full_ref = self.ref_conv(full_ref).flatten(2).transpose(1, 2)
@@ -1256,7 +1382,6 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
             torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))],
                       dim=1) for u in x
         ])
-        # print(x.shape, 'x.patahflatcatttttttt')
 
         # time embeddings
         with amp.autocast(dtype=torch.float32):
@@ -1264,34 +1389,17 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                 sinusoidal_embedding_1d(self.freq_dim, t).float())
             e0 = self.time_projection(e).unflatten(1, (6, self.dim))
             # to bfloat16 for saving memeory
-            # assert e.dtype == torch.float32 and e0.dtype == torch.float32
             e0 = e0.to(dtype)
             e = e.to(dtype)
 
-        context, context_audio, latent_t, ip_mask, audio_scale = context
+        context, context_audio, latent_t, ip_mask = context
+        first_frame_audio_emb_s, latter_frame_audio_emb_s = get_ai2v_audio(context_audio, 
+            vae_scale=4, 
+            audio_window=5, 
+            device=x.device,
+            dtype=x.dtype)
 
-        context_audio = self.audio2token(context_audio)
-        # print(context_audio.shape, '1268')
-        pos_idx_ranges = split_audio_sequence(
-        context_audio.size(1), num_frames=context_audio.size(1) // 2
-        )
-        context_audio, audio_context_lens = split_tensor_with_padding(
-            context_audio, pos_idx_ranges, expand_length=4
-        )  # [b,21,9+8,768]
-        # print(context_audio.shape, '1277')
-        context_audio = context_audio.flatten(0,1).to(x.dtype)
-        # print(context_audio.shape, '1279')
-
-        # print(audio_context_lens, 'audio_context_lens')
-        """
-        audio_tensor_list = []
-        for audio_clip in context_audio:
-            cond_audio_clip = self.audio2token(audio_clip) #bt c_l, d
-            audio_tensor_list.append(cond_audio_clip) # [bt, c_l, d] * latent_t
-        context_audio = torch.stack(audio_tensor_list, dim=0) #b=1 latent_t, l, d
-        context_audio = context_audio.flatten(0,1).to(x.dtype)
-        """
-        
+        context_audio = self.audio_injection(first_frame_audio_emb_s, latter_frame_audio_emb_s) # B T 32 1536
 
         # context
         context_lens = None
@@ -1303,8 +1411,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
             ]))
 
         if clip_fea is not None:
-            context_clip = self.img_emb(clip_fea)  # bs x 257 x dim
-            #print(context_clip.shape, context.shape, 'contextshape'*3) #torch.SizeSize([3, 257, 1536]) torch.Size([3, 512, 1536]) 
+            context_clip = self.img_emb(clip_fea) 
             context = torch.concat([context_clip, context], dim=1)
 
         # Context Parallel
@@ -1357,7 +1464,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                             seq_lens,
                             grid_sizes,
                             self.freqs,
-                            (context, context_audio, latent_t, ip_mask, audio_context_lens, audio_scale),
+                            (context, context_audio, latent_t, ip_mask, None),
                             context_lens,
                             dtype,
                             **ckpt_kwargs,
@@ -1369,7 +1476,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                             seq_lens=seq_lens,
                             grid_sizes=grid_sizes,
                             freqs=self.freqs,
-                            context=(context, context_audio, latent_t, ip_mask, audio_context_lens, audio_scale),
+                            context=(context, context_audio, latent_t, ip_mask, None),
                             context_lens=context_lens,
                             dtype=dtype
                         )
@@ -1380,7 +1487,17 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                 else:
                     self.teacache.previous_residual_uncond = x.cpu() - ori_x if self.teacache.offload else x - ori_x
         else:
-            for block in self.blocks:
+            for block_index,block in enumerate(self.blocks):
+                if gpu_manager is not None:
+                    if block_index < len(gpu_manager.managed_modules):
+                        module = gpu_manager.managed_modules[block_index]
+                        if hasattr(module, 'to'):
+                            module.to(gpu_manager.device)
+                    if block_index > 0 and (block_index - 1) < len(gpu_manager.managed_modules):
+                        prev_module = gpu_manager.managed_modules[block_index - 1]
+                        if hasattr(prev_module, 'to'):
+                            prev_module.to('cpu')
+              
                 if torch.is_grad_enabled() and self.gradient_checkpointing:
 
                     def create_custom_forward(module):
@@ -1396,7 +1513,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                         seq_lens,
                         grid_sizes,
                         self.freqs,
-                        (context, context_audio, latent_t, ip_mask, audio_context_lens, audio_scale),
+                        (context, context_audio, latent_t, ip_mask, None),
                         context_lens,
                         dtype,
                         **ckpt_kwargs,
@@ -1408,7 +1525,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                         seq_lens=seq_lens,
                         grid_sizes=grid_sizes,
                         freqs=self.freqs,
-                        context=(context, context_audio, latent_t, ip_mask, audio_context_lens, audio_scale),
+                        context=(context, context_audio, latent_t, ip_mask, None),
                         context_lens=context_lens,
                         dtype=dtype
                     )
@@ -1425,14 +1542,11 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
         # head
         
         x = self.head(x, e)
-        # print(x.shape, 'headafter', or_x.shape)
 
         # unpatchify
         x = self.unpatchify(x, grid_sizes)
-        # print(x[0].shape, 'unpatchify')
 
         x = torch.stack(x)
-        # print(x.shape, 'torch.stack(x)')
 
         if self.teacache is not None:
             self.teacache.cnt += 1
@@ -1538,7 +1652,7 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
                     from safetensors.torch import load_file, safe_open
                     model_files_safetensors = glob.glob(os.path.join(pretrained_model_path, "*.safetensors"))
                     state_dict = {}
-                    print(model_files_safetensors)
+                    # print(model_files_safetensors)
                     for _model_file_safetensors in model_files_safetensors:
                         _state_dict = load_file(_model_file_safetensors)
                         for key in _state_dict:
@@ -1629,6 +1743,3 @@ class WanTransformerAudioMask3DModel(ModelMixin, ConfigMixin, FromOriginalModelM
         
         model = model.to(torch_dtype)
         return model
-    
-
-

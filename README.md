@@ -7,7 +7,11 @@ You can use EchoMimic & EchoMimic V2  & EchoMimic V3 in comfyui.
 
 ---
 
-# New Updates 
+# New Updates
+* Support v3 flash model,now you can infer 768x768 size in 12G Vram use 8 steps，768x512 need 6.5G (need new transformer and audio model)，need ‘ block_offload ’ on;  
+* 支持v3 flash模型，并加以优化，12G，8步可以推理768x768的视频，6.5G可以推理768X512的视频,需要开启block_offload块卸载功能; 
+
+ # Previous 
 * you can set lowram 'False ' to close mmgp 's fp8 quantum ，will get more quality output./设置lowram为false时，关闭mmgp的FP8 量化以得到更好的质量。
 * add LCM support ,if set step=4（and lightX2V lora）,will run in LCM/ 步数设置为4时，自动开启LCM，当然也要lora
 * v3版本新增lightX2V Lora的支持， step可以设置为10步（使用Lora时自动开启Unip）/you can use lightX2V Lora when use V3 version, set step=10; 
@@ -36,7 +40,7 @@ If use v1 version 如果要使用V1版本：
 pip install --no-deps facenet-pytorch 
 
 ```
-If use v3 version 如果要使用V3版本： 
+If use v3 version 如果要使用V3版本：  # v3 flash do not use it  #flash模型不用
 ```
 pip install retina-face==0.0.17 #使用须外网下载模型，待处理
 pip install mmgp # optional 可选 
@@ -55,7 +59,44 @@ pip install ffmpeg-python
 
 # 3. Models Required 
 ----
-**3.1 V1 & V2 Shared model v1 和 v2 共用的模型**:   
+**3.1 v3 version**   
+3.1.1 from [Wan2.1-Fun-V1.1-1.3B-InP](https://huggingface.co/alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP/tree/main)downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   v3 and v3 flash
+3.1.2 use comfyui ,[clipvison-h](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/clip_vision) and [umt5_xxl_fp8_e4m3fn_scaled.safetensors ](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/text_encoders)  v3 and v3 flash
+3.1.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)    v3 only
+3.1.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer   v3 only  
+3.1.5 [retinaface.h5](https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5)  目录下没有一般会自动下载 v3 only
+3.1.6 可选/optional lora  [kijai](https://huggingface.co/Kijai/WanVideo_comfy/tree/main/Lightx2v) v3 only
+3.1.7 [BadToBest/EchoMimicV3/echomimicv3-flash-pro](https://huggingface.co/BadToBest/EchoMimicV3/tree/main/echomimicv3-flash-pro)   v3 flash
+3.1.8 [chinese-wav2vec2-base](https://modelscope.cn/models/TencentGameMate/chinese-wav2vec2-base) v3 flash
+```
+├── ComfyUI/models/echo_mimic/transformer 
+|         ├── diffusion_pytorch_model.safetensors  # Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。  v3 and v3 flash
+|         ├── config.json
+├── ComfyUI/models/echo_mimic/wav2vec2-base-960h   # v3 only 
+|         ├── all config json files 
+|         ├──  model.safetensors
+├── ComfyUI/models/clip
+|         ├── umt5_xxl_fp8_e4m3fn_scaled.safetensors   # v3 and v3 flash
+├── ComfyUI/models/clip_vision  # v3 and v3 flash 
+|         ├──clipvison-h # 1.26G
+├── ComfyUI/models/echo_mimic/
+|         ├──diffusion_pytorch_model.safetensors  # BadToBest/EchoMimicV3   v3 only 
+├── ComfyUI/models/echo_mimic/echomimicv3-flash-pro/
+|         ├──diffusion_pytorch_model.safetensors  # BadToBest/EchoMimicV3  v3 flashonly 
+├── ComfyUI/models/echo_mimic/chinese-wav2vec2-base/    #v3 flashonly 
+|         ├──chinese-wav2vec2-base-fairseq-ckpt.pt 
+|         ├──model.safetensors
+|         ├──all config      
+├── ComfyUI/models/vae
+|         ├── Wan2.1_VAE.pth    # v3 and v3 flash 
+├── ComfyUI/models/echo_mimic/.deepface/weights/    #注意.deepface前面有个点，这个是方便不能翻墙玩家  #  v3 only 
+|         ├──retinaface.h5
+├── ComfyUI/models/loras/    
+|         ├──lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors  #KJ #  v3 only 
+
+```
+
+**3.2 V1 & V2 Shared model v1 和 v2 共用的模型**:   
 如果能直连抱脸,点击就会自动下载所需模型,不需要手动下载.  
 * unet [link](https://huggingface.co/lambdalabs/sd-image-variations-diffusers)    
 * V1 & V2 audio  [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
@@ -72,7 +113,7 @@ pip install ffmpeg-python
 |             ├── diffusion_pytorch_model.safetensors or rename sd-vae-ft-mse.safetensors
 ```
 
-**3.2 V1 models V1使用以下模型**:     
+**3.3 V1 models V1使用以下模型**:     
 * V1 address   [link](https://huggingface.co/BadToBest/EchoMimic/tree/main)    
 * Audio-Drived Algo Inference 音频驱动        
 ```
@@ -98,7 +139,7 @@ Using Pose-Drived Algo Inference  ACC   姿态驱动加速版
 |         ├── motion_module_pose_acc.pth
 ```
 
-**3.2 v2 version**   
+**3.4 v2 version**   
 use model below V2, Automatic download, you can manually add it 使用以下模型,使用及自动下载,你可以手动添加:    
 模型地址address:[huggingface](https://huggingface.co/BadToBest/EchoMimicV2/tree/main)
 ```
@@ -120,53 +161,28 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
 |         ├── sapiens_1b_goliath_best_goliath_AP_639_torchscript.pt2  or/或者 sapiens_1b_goliath_best_goliath_AP_639_torchscript_fp16.pt2
 ```
 
-**3.3 v3 version**   
-3.3.1 from [Wan2.1-Fun-V1.1-1.3B-InP](https://huggingface.co/alibaba-pai/Wan2.1-Fun-V1.1-1.3B-InP/tree/main)downlaod Wan2.1_VAE.pth and diffusion_pytorch_model.safetensors   
-3.3.2 use comfyui ,[clipvison-h](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/clip_vision) and [umt5_xxl_fp8_e4m3fn_scaled.safetensors ](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/tree/main/split_files/text_encoders)  
-3.3.3 [wav2vec2-base-960h](https://huggingface.co/facebook/wav2vec2-base-960h/tree/main)   
-3.3.4 [BadToBest/EchoMimicV3](https://huggingface.co/BadToBest/EchoMimicV3/tree/main) transformer    
-3.3.5 [retinaface.h5](https://github.com/serengil/deepface_models/releases/download/v1.0/retinaface.h5)  目录下没有一般会自动下载
-3.3.6 可选/optional lora  [kijai](https://huggingface.co/Kijai/WanVideo_comfy/tree/main/Lightx2v)
-```
-├── ComfyUI/models/echo_mimic/transformer 
-|         ├── diffusion_pytorch_model.safetensors  # Wan2.1-Fun-V1.1-1.3B-InP transformer #3.13G 务必注意模型同名。
-|         ├── config.json
-├── ComfyUI/models/echo_mimic/wav2vec2-base-960h
-|         ├── all config json files 
-|         ├──  model.safetensors
-├── ComfyUI/models/clip
-|         ├── umt5_xxl_fp8_e4m3fn_scaled.safetensors
-├── ComfyUI/models/clip_vision
-|         ├──clipvison-h # 1.26G
-├── ComfyUI/models/echo_mimic/
-|         ├──diffusion_pytorch_model.safetensors  # BadToBest/EchoMimicV3
-├── ComfyUI/models/vae
-|         ├── Wan2.1_VAE.pth
-├── ComfyUI/models/echo_mimic/.deepface/weights/    #注意.deepface前面有个点，这个是方便不能翻墙玩家
-|         ├──retinaface.h5
-├── ComfyUI/models/loras/    
-|         ├──lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors  #KJ
-
-```
 
 
 # 4 Example
 -----
+* V3  flash version
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example.png" width="80%">
+
 * V3 version
-<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v3.png" width="60%">
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v3.png" width="80%">
 
 * V2 version
 
 * V2加载自定义视频驱动视频，V2 loads custom video driver videos
-<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v2_pose.png" width="60%">
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v2_pose.png" width="80%">
 
 * Echomimic_v2 use default pose  new version 使用官方默认的pose文件
-<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v2_pose.png" width="60%">
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main/example_workflows/example_v2_pose.png" width="80%">
 
 * V1 version
 
 * audio driver 音频驱动
-<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main//example_workflows/example_v1.png" width="60%">    
+<img src="https://github.com/smthemex/ComfyUI_EchoMimic/blob/main//example_workflows/example_v1.png" width="80%">    
 
 
 * 示例的 VH node : [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
@@ -202,7 +218,6 @@ sapiens的pose 模型可以量化为fp16的，详细见我的sapiens插件 [地�
   * use_mmgp 仅V3版本有效   
   * partial_video_length 仅V3版本有效，数值越低显存占用越低；
   * teacache 仅V3版本有效；     
-
 
   
 ---

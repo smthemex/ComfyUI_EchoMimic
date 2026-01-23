@@ -1,0 +1,509 @@
+{
+  "id": "52c52992-a3bc-4b4a-b2bf-485b64102a51",
+  "revision": 0,
+  "last_node_id": 25,
+  "last_link_id": 52,
+  "nodes": [
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        7250.68310546875,
+        -426.81036376953125
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            45
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "demo_ch_woman_04.png",
+        "image"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "LoadAudio",
+      "pos": [
+        7251.185546875,
+        -66.02975463867188
+      ],
+      "size": [
+        270,
+        136
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            47,
+            50
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "chunwang.wav",
+        null,
+        null
+      ]
+    },
+    {
+      "id": 25,
+      "type": "SaveVideo",
+      "pos": [
+        8388.304733756437,
+        24.067962033352288
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 52
+        }
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "video/ComfyUI",
+        "auto",
+        "auto"
+      ]
+    },
+    {
+      "id": 24,
+      "type": "CreateVideo",
+      "pos": [
+        8403.195063911746,
+        -309.7256561833562
+      ],
+      "size": [
+        270,
+        78
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 49
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 50
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            52
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        30
+      ]
+    },
+    {
+      "id": 21,
+      "type": "Echo_Sampler",
+      "pos": [
+        8043.2548828125,
+        -335.8991394042969
+      ],
+      "size": [
+        270,
+        246
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "link": 31
+        },
+        {
+          "name": "emb",
+          "type": "MODEL_EMB_E",
+          "link": 43
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            49
+          ]
+        },
+        {
+          "name": "frame_rate",
+          "type": "FLOAT",
+          "links": [
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Sampler"
+      },
+      "widgets_values": [
+        917844618,
+        "randomize",
+        6,
+        8,
+        16000,
+        12,
+        3,
+        false
+      ]
+    },
+    {
+      "id": 23,
+      "type": "Echo_Predata",
+      "pos": [
+        7641.043632531231,
+        -95.71714694185384
+      ],
+      "size": [
+        357.8397521972656,
+        529.4112548828125
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "info",
+          "type": "MODEL_INFO_E",
+          "link": 44
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 45
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 47
+        },
+        {
+          "name": "clip",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 46
+        },
+        {
+          "name": "clip_vision",
+          "shape": 7,
+          "type": "CLIP_VISION",
+          "link": 48
+        },
+        {
+          "name": "video_images",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "emb",
+          "type": "MODEL_EMB_E",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_Predata"
+      },
+      "widgets_values": [
+        "a person  is speake",
+        " Gesture is bad. Gesture is unclear. Strange and twisted hands. Bad hands. Bad fingers. Unclear and blurry hands. 手部快速摆动, 手指频繁抽搐, 夸张手势, 重复机械性动作.",
+        "pose_01",
+        512,
+        768,
+        25,
+        0.1,
+        0.8,
+        251,
+        97,
+        false,
+        false
+      ]
+    },
+    {
+      "id": 20,
+      "type": "Echo_LoadModel",
+      "pos": [
+        7689.095886756985,
+        -432.3303281071995
+      ],
+      "size": [
+        270,
+        270
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL_PIPE_E",
+          "links": [
+            31
+          ]
+        },
+        {
+          "name": "info",
+          "type": "MODEL_INFO_E",
+          "links": [
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Echo_LoadModel"
+      },
+      "widgets_values": [
+        "Wan2.1_VAE.pth",
+        "None",
+        "audio_drived",
+        "audio_drived",
+        true,
+        false,
+        "HighRAM_LowVRAM",
+        "None",
+        "V3_flash"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "CLIPVisionLoader",
+      "pos": [
+        7269.315691287003,
+        288.84714998335517
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP_VISION",
+          "type": "CLIP_VISION",
+          "links": [
+            48
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPVisionLoader"
+      },
+      "widgets_values": [
+        "clip_vision_h_wan.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [
+        7261.24462890625,
+        128.91090393066406
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "default"
+      ]
+    }
+  ],
+  "links": [
+    [
+      31,
+      20,
+      0,
+      21,
+      0,
+      "MODEL_PIPE_E"
+    ],
+    [
+      43,
+      23,
+      0,
+      21,
+      1,
+      "MODEL_EMB_E"
+    ],
+    [
+      44,
+      20,
+      1,
+      23,
+      0,
+      "MODEL_INFO_E"
+    ],
+    [
+      45,
+      8,
+      0,
+      23,
+      1,
+      "IMAGE"
+    ],
+    [
+      46,
+      5,
+      0,
+      23,
+      3,
+      "CLIP"
+    ],
+    [
+      47,
+      9,
+      0,
+      23,
+      2,
+      "AUDIO"
+    ],
+    [
+      48,
+      15,
+      0,
+      23,
+      4,
+      "CLIP_VISION"
+    ],
+    [
+      49,
+      21,
+      0,
+      24,
+      0,
+      "IMAGE"
+    ],
+    [
+      50,
+      9,
+      0,
+      24,
+      1,
+      "AUDIO"
+    ],
+    [
+      51,
+      21,
+      1,
+      24,
+      2,
+      "FLOAT"
+    ],
+    [
+      52,
+      24,
+      0,
+      25,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8954302432552457,
+      "offset": [
+        -6854.591321273491,
+        592.6436502485363
+      ]
+    },
+    "frontendVersion": "1.32.9",
+    "workflowRendererVersion": "LG",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

@@ -499,7 +499,7 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
         )
         ref_image_latents = self.vae.encode(ref_image_tensor).latent_dist.mean
         ref_image_latents = ref_image_latents * 0.18215  # (b , 4, h, w)
-
+        #print("ref_image_latents.shape: ", ref_image_latents.shape,ref_image_latents.is_cuda)
         context_scheduler = get_context_scheduler(context_schedule)
 
         # denoising loop
@@ -534,6 +534,7 @@ class EchoMimicV2Pipeline(DiffusionPipeline):
 
                 # 1. Forward reference image
                 if t_i == 0:
+                    
                     self.reference_unet(
                         ref_image_latents,
                         torch.zeros_like(t),

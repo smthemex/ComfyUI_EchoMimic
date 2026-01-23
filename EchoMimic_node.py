@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 # -*- coding: UTF-8 -*-
-import io
+import io as io_base
 import os
 import random
 import numpy as np
@@ -18,6 +18,7 @@ print(os.path.join(folder_paths.models_dir,"echo_mimic"))
 from .utils import find_directories,process_video, cf_tensor2cv,process_video_v2,load_images,nomarl_upscale
 from .origin_infer import Echo_v1_load_model,Echo_v2_load_model,Echo_v1_predata,Echo_v2_predata
 from .echomimic_v3.infer import load_v3_model,infer_v3,Config,Echo_v3_predata
+from .echomimic_v3.infer_flash_pro import load_v3_flash,infer_flash,Flash_Echo_v3_predata
 
 
 
@@ -92,9 +93,9 @@ class Echo_LoadModel:
                 "infer_mode": (["audio_drived", "audio_drived_acc", "pose_normal_dwpose","pose_normal_sapiens", "pose_acc"],),
                 "lowvram": ("BOOLEAN", {"default": True},),
                 "teacache_offload": ("BOOLEAN", {"default": True},),
-                "use_mmgp": (["LowRAM_LowVRAM","None", "VerylowRAM_LowVRAM","LowRAM_HighVRAM","HighRAM_LowVRAM","HighRAM_HighVRAM" ],), 
-
-                "version": (["V3","V2", "V1", ],), },
+                "block_offload": ("BOOLEAN", {"default": True},),
+                "use_mmgp": (["None","LowRAM_LowVRAM", "VerylowRAM_LowVRAM","LowRAM_HighVRAM","HighRAM_LowVRAM","HighRAM_HighVRAM" ],), 
+                "version": (["V3_flash","V3","V2", "V1", ],), },
         }
     
     RETURN_TYPES = ("MODEL_PIPE_E", "MODEL_INFO_E")
@@ -102,7 +103,7 @@ class Echo_LoadModel:
     FUNCTION = "main_loader"
     CATEGORY = "EchoMimic"
     
-    def main_loader(self, vae, lora,denoising, infer_mode,  lowvram,teacache_offload,use_mmgp, version):
+    def main_loader(self, vae, lora,denoising, infer_mode,  lowvram,teacache_offload,block_offload,use_mmgp, version):
         
         config_v3,audio_pt,face_locator_pt,pose_encoder_pt,tokenizer,temporal_compression_ratio=None,None,None,None,None,None
         if "V1"==version :
@@ -115,10 +116,13 @@ class Echo_LoadModel:
             config_v3.teacache_offload=teacache_offload
             config_v3.quantize_transformer=lowvram
             lora_path=folder_paths.get_full_path("loras", lora) if lora!="None" else None
-
-            model, temporal_compression_ratio,tokenizer=load_v3_model(current_path,weigths_current_path,config_v3, device,use_mmgp,vae,lora_path)
+            if "V3_flash"==version :
+                inp_vae="none"
+                model,temporal_compression_ratio,tokenizer= load_v3_flash("Flow_Unipc",vae,inp_vae,weigths_current_path,os.path.join(current_path, "echomimic_v3/config/config.yaml"),current_path, use_mmgp,device,block_offload)
+            else:
+                model, temporal_compression_ratio,tokenizer=load_v3_model(current_path,weigths_current_path,config_v3, device,use_mmgp,vae,lora_path)
         print("##### model loaded #####")
-        info = {"lowvram": lowvram,"version":version,"tokenizer":tokenizer,
+        info = {"lowvram": lowvram,"version":version,"tokenizer":tokenizer,"block_offload":block_offload,
                 "infer_mode":infer_mode,"audio_pt":audio_pt, "face_locator_pt":face_locator_pt,"pose_encoder_pt":pose_encoder_pt,"temporal_compression_ratio":temporal_compression_ratio}
         info.update({"config":config_v3})
         return (model,info)
@@ -145,7 +149,7 @@ class Echo_Predata:
                 "facemask_ratio": ("FLOAT", {"default": 0.1, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "facecrop_ratio": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.1, "round": 0.01}),
                 "length": ("INT", {"default": 100, "min": 12, "max": 5000, "step": 1, "display": "number"}),
-                "partial_video_length": ([33,65,97,113, 129,193],),
+                "partial_video_length": ([33,65,97,113,129,193],),
                 "draw_mouse": ("BOOLEAN", {"default": False},),
                 "motion_sync_": ("BOOLEAN", {"default": False},),
                 },
@@ -182,7 +186,7 @@ class Echo_Predata:
         #pre audio
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
         audio_file = os.path.join(folder_paths.get_input_directory(), f"audio_{audio_file_prefix}_temp.wav")
-        buff = io.BytesIO()
+        buff = io_base.BytesIO()
    
         torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
         with open(audio_file, 'wb') as f:
@@ -195,7 +199,11 @@ class Echo_Predata:
         elif "V2"==version :
             emb = Echo_v2_predata(face_img,audio_file,height,width,info.get("pose_encoder_pt"),info.get("audio_pt"),
                                   current_path,video_images,tensorrt_lite,device,fps,length,info.get("infer_mode"),weigths_current_path,pose_dir)
-        else:#v3
+        elif version=="V3_flash":
+            emb = Flash_Echo_v3_predata(image_encoder,text_encoder,info.get("tokenizer"),prompt,negative_prompt,
+                                            face_img,(768,768),audio_file,weigths_current_path,fps,length,
+                                            info.get("temporal_compression_ratio"),device,torch.bfloat16)
+        else:
             config=info.get("config")
             config.fps=fps
             config.partial_video_length=int(partial_video_length)
@@ -244,15 +252,23 @@ class Echo_Sampler:
                   save_video,  emb.get("audio_file_prefix"),emb.get("LEN"),emb.get("whisper_chunks") )    
 
         else: #v3
-            config = emb.get("config")
-            config.num_inference_steps=steps
-            config.guidance_scale=cfg
+            if version=="V3_flash":
+                output_video=infer_flash(model,emb.get("audio_embeds"),emb.get("prompt_embeds"),emb.get("negative_prompt_embeds"),emb.get("clip_context"),
+                                         emb.get("fps"),steps,seed,emb.get("video_length_actual"),device,emb.get("block_offload"),
+                                         emb.get("input_video"),emb.get("input_video_mask"),emb.get("sample_height"),emb.get("sample_width"),
+                                         cfg,emb.get("latent_frames"),emb.get("audio_file_prefix")
+                                         )
+                                         
+            else:
+                config = emb.get("config")
+                config.num_inference_steps=steps
+                config.guidance_scale=cfg
 
-            #config.sample_size=(emb.get("height"),emb.get("width"))
-            output_video=infer_v3(model, config, device,emb.get("video_length"),emb.get("prompt_embeds"),emb.get("negative_prompt_embeds"),
-             emb.get("temporal_compression_ratio"),seed,emb.get("partial_video_length"),emb.get("audio_embeds"),emb.get("ip_mask"),
-             emb.get("sample_height"),emb.get("sample_width"),emb.get("clip_context"),
-             emb.get("ref_image_pil"),emb.get("audio_file_prefix"))
+                #config.sample_size=(emb.get("height"),emb.get("width"))
+                output_video=infer_v3(model, config, device,emb.get("video_length"),emb.get("prompt_embeds"),emb.get("negative_prompt_embeds"),
+                                    emb.get("temporal_compression_ratio"),seed,emb.get("partial_video_length"),emb.get("audio_embeds"),emb.get("ip_mask"),
+                                    emb.get("sample_height"),emb.get("sample_width"),emb.get("clip_context"),
+                                    emb.get("ref_image_pil"),emb.get("audio_file_prefix"))
 
         frame_rate = float(emb.get("fps"))
         if not lowvram and version!="V3":  # for upsacle ,need  VR
