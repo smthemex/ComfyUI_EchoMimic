@@ -181,6 +181,7 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
         #low_cpu_mem_usage=True if not config.fsdp_dit else False,
         torch_dtype=config.weight_dtype,
     )
+    
     if config.transformer_path is not None:
         if config.transformer_path.endswith("safetensors"):
           from safetensors.torch import load_file, safe_open
@@ -258,11 +259,6 @@ def load_v3_model(node_dir,weigths_current_path,config, device,use_mmgp,vae_path
         pipeline.to(device)
     temporal_compression_ratio=pipeline.vae.config.temporal_compression_ratio
     #print(f"temporal_compression_ratio: {temporal_compression_ratio}") #4
-   
-
-   
-
-
     return pipeline,temporal_compression_ratio,tokenizer
 
 def infer_v3(pipeline, config, device,video_length,prompt_embeds,negative_prompt_embeds,

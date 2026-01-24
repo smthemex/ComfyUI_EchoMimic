@@ -175,7 +175,7 @@ class SapiensPoseEstimation:
         return keypoints
 
  
-    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float],filter_obj_done) ->(np.ndarray,tuple) :
+    def draw_keypoints(self, img: np.ndarray, keypoints: dict, bbox: List[float],filter_obj_done): # ->(np.ndarray,tuple) :
         
         if filter_obj_done:
             get_list=[]
