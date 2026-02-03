@@ -59,7 +59,7 @@ def save_videos_from_pil(pil_images, path, fps=8, audio_path=None):
     if save_fmt == ".mp4":
         codec = "libx264"
         container = av.open(path, "w")
-        stream = container.add_stream(codec, rate=fps)
+        stream = container.add_stream(codec, rate=int(fps))
 
         stream.width = width
         stream.height = height
@@ -130,7 +130,7 @@ def save_videos_grid(videos: torch.Tensor, path: str, audio_path=None, rescale=F
         outputs.append(z)
     #os.makedirs(os.path.dirname(path), exist_ok=True)
     if save_video:
-        save_videos_from_pil(outputs, path, fps, audio_path=audio_path)
+        save_videos_from_pil(outputs, path, int(fps), audio_path=audio_path)
     
     return outputs
 
@@ -174,7 +174,7 @@ def get_fps(video_path):
     video_stream = next(s for s in container.streams if s.type == "video")
     fps = video_stream.average_rate
     container.close()
-    return fps
+    return int(fps)
 
 
 def crop_and_pad(image, rect):
