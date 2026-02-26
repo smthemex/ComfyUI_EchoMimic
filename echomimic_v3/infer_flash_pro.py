@@ -10,7 +10,7 @@ from PIL import Image
 from transformers import AutoTokenizer
 import folder_paths
 import torchvision.transforms.functional as TF
-from .src.dist import set_multi_gpus_devices, shard_model
+#from .src.dist import set_multi_gpus_devices, shard_model
 from .src.wan_vae import AutoencoderKLWan
 from .src.wan_image_encoder import  CLIPModel
 from .src.wan_text_encoder import  WanT5EncoderModel
