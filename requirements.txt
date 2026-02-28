@@ -16,5 +16,6 @@ torchaudio
 transformers
 diffusers
 einops
+scikit-image
 #facenet_pytorch
 #controlnet-aux
