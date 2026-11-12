@@ -19,10 +19,12 @@ from diffusers.models.modeling_utils import ModelMixin
 from diffusers.utils import is_torch_version, logging
 from torch import nn
 
-from .dist import (get_sequence_parallel_rank,
-                    get_sequence_parallel_world_size, get_sp_group,
-                    xFuserLongContextAttention)
-from .dist.wan_xfuser import usp_attn_forward
+# [winpc 2026-11-12 补丁] 上游未发布 dist/ 多卡模块,同仓 wan_transformer3d_audio.py 等 4 处
+# 均已注释此导入;以下符号仅在 enable_multi_gpus_inference()(多卡)内使用,单卡不触达。回滚:取消注释
+# from .dist import (get_sequence_parallel_rank,
+#                     get_sequence_parallel_world_size, get_sp_group,
+#                     xFuserLongContextAttention)
+# from .dist.wan_xfuser import usp_attn_forward
 from .cache_utils import TeaCache
 from .wan_camera_adapter import SimpleAdapter
 
@@ -30,16 +32,19 @@ from .wan_camera_adapter import SimpleAdapter
 from einops import rearrange
 import torch.nn.functional as F
 
+# [winpc 2026-11-12 补丁] 本机无可用 flash-attn(Windows/py3.13/cu130 无官方 wheel)。
+# 原仅捕获 ModuleNotFoundError,遇残缺桩(import 成功但 varlen 函数为 None)会误判可用并在采样期
+# 报 NoneType not callable。改为宽捕获 + 校验关键函数真可调用,不可用则回退 torch SDPA。回滚:还原本块
 try:
     import flash_attn_interface
-    FLASH_ATTN_3_AVAILABLE = True
-except ModuleNotFoundError:
+    FLASH_ATTN_3_AVAILABLE = callable(getattr(flash_attn_interface, "flash_attn_varlen_func", None))
+except Exception:
     FLASH_ATTN_3_AVAILABLE = False
 
 try:
     import flash_attn
-    FLASH_ATTN_2_AVAILABLE = True
-except ModuleNotFoundError:
+    FLASH_ATTN_2_AVAILABLE = callable(getattr(flash_attn, "flash_attn_varlen_func", None))
+except Exception:
     FLASH_ATTN_2_AVAILABLE = False
 
 
