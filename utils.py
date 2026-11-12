@@ -20,8 +20,16 @@ except:
     except:
         from moviepy import *
 import random
-from .src.utils.mp_utils  import LMKExtractor
-from .src.utils.motion_utils import motion_sync
+# [winpc 2026-11-12 补丁] mediapipe legacy solutions API 与 Python 3.13 不兼容且无对应版本轮子,
+# 而 LMKExtractor/motion_sync 仅被 v1/v2 动作驱动路径(motion_sync_main)使用,V3/Flash 链路不经过。
+# 改为可选导入:缺失时 v1/v2 动作驱动不可用,V3/Flash 与其余节点不受影响。回滚:git checkout utils.py
+try:
+    from .src.utils.mp_utils  import LMKExtractor
+    from .src.utils.motion_utils import motion_sync
+except Exception as _mp_err:
+    print(f"[ComfyUI_EchoMimic] mediapipe 不可用,已停用 v1/v2 动作驱动(不影响 V3/Flash): {_mp_err}")
+    LMKExtractor = None
+    motion_sync = None
 from .src.utils.util import save_videos_grid, crop_and_pad,crop_and_pad_rectangle,center_crop
 from .echomimic_v2.src.utils.dwpose_util import draw_pose_select_v2
 

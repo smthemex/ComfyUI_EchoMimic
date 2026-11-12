@@ -187,8 +187,15 @@ class Echo_Predata:
         audio_file_prefix = ''.join(random.choice("0123456789") for _ in range(6))
         audio_file = os.path.join(folder_paths.get_input_directory(), f"audio_{audio_file_prefix}_temp.wav")
         buff = io_base.BytesIO()
-   
-        torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
+
+        # [winpc 2026-11-12 补丁] torchaudio 2.11 的 save 依赖 torchcodec(本机未装且与 torch 版本强绑定),
+        # 直接用已装的 soundfile 写 FLAC 到内存缓冲。回滚:恢复为
+        # torchaudio.save(buff, audio["waveform"].squeeze(0), audio["sample_rate"], format="FLAC")
+        import soundfile as sf
+        _wav_t = audio["waveform"].squeeze(0)
+        # soundfile 期望 (samples, channels);单声道时为一维
+        _arr = _wav_t.t().cpu().numpy() if _wav_t.dim() > 1 else _wav_t.cpu().numpy()
+        sf.write(buff, _arr, int(audio["sample_rate"]), format="FLAC")
         with open(audio_file, 'wb') as f:
             f.write(buff.getbuffer())
 
